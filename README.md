@@ -1,11 +1,11 @@
 # 智能教学实训系统文档
 
-## 1. 项目概述
+## 一、项目概述
 
-### 1.1 系统架构
+### 1. 系统架构
 本系统采用Vue.js框架构建，实现教师、学生和管理员不同角色的智能教学功能。
 
-### 1.2 目录结构
+### 2. 目录结构
 ```
 src/
 ├── assets/                  # 静态资源文件夹
@@ -39,16 +39,16 @@ src/
 └── main.js                  # 应用入口文件
 ```
 
-## 2. 核心组件详细文档
+## 二、核心组件详细文档
 
-### 2.1 布局组件 (layout/)
+### 1. 布局组件 (layout/)
 
-#### 2.1.1 NavMenu.vue
+#### 1.1. NavMenu.vue
 
-##### 2.1.1.1 组件概述
+##### ① 组件概述
 导航菜单组件，根据用户角色动态显示不同的导航选项。
 
-##### 2.1.1.2 数据结构
+##### ② 数据结构
 ```javascript
 data() {
   return {
@@ -57,21 +57,21 @@ data() {
 }
 ```
 
-##### 2.1.1.3 生命周期钩子
+##### ③ 生命周期钩子
 ```javascript
 created() {
   this.setNavItems(); // 组件创建时初始化导航菜单
 }
 ```
 
-##### 2.1.1.4 方法详解
+##### ④ 方法详解
 | 方法名 | 参数 | 返回值 | 功能描述 |
 |--------|------|--------|----------|
 | `setNavItems()` | 无 | 无 | 根据用户角色设置导航菜单项 |
 | `getUserData()` | 无 | Object | 从localStorage获取并解析用户数据JSON |
 
-##### 2.1.1.5 方法实现
-###### 2.1.1.5.1 setNavItems()
+##### ⑤ 方法实现
+###### i. setNavItems()
 ```javascript
 setNavItems() {
   // 获取用户数据
@@ -108,7 +108,7 @@ setNavItems() {
 }
 ```
 
-###### 2.1.1.5.2 getUserData()
+###### ii. getUserData()
 ```javascript
 getUserData() {
   // 从localStorage获取userData并解析JSON
@@ -129,7 +129,7 @@ getUserData() {
 }
 ```
 
-##### 2.1.1.6 角色权限控制
+##### ⑥ 角色权限控制
 | 用户角色 | 可见菜单项 |
 |---------|------------|
 | 所有用户/guest | 首页 |
@@ -137,7 +137,7 @@ getUserData() {
 | student | 首页、学生端 |
 | admin | 首页、系统管理 |
 
-##### 2.1.1.7 样式定义
+##### ⑦ 样式定义
 ```css
 .nav ul {
   display: flex;
@@ -162,7 +162,7 @@ getUserData() {
 }
 ```
 
-##### 2.1.1.8 使用示例
+##### ⑧ 使用示例
 ```vue
 <template>
   <nav-menu></nav-menu>
@@ -179,37 +179,37 @@ export default {
 </script>
 ```
 
-#### 2.1.2 AppHeader.vue
+#### 1.2. AppHeader.vue
 
-##### 2.1.2.1 组件概述
+##### ① 组件概述
 应用头部组件，显示应用标题、导航菜单和用户信息。
 
-##### 2.1.2.2 组件依赖
+##### ② 组件依赖
 - NavMenu.vue - 导航菜单组件
 
-##### 2.1.2.3 功能特性
+##### ③ 功能特性
 - 显示应用logo和标题
 - 集成导航菜单
 - 显示用户信息和操作下拉菜单
 - 响应式设计，适配不同屏幕尺寸
 
-#### 2.1.3 SideBar.vue
+#### 1.3. SideBar.vue
 
-##### 2.1.3.1 组件概述
+##### ① 组件概述
 侧边栏组件，显示用户信息和角色相关菜单。
 
-##### 2.1.3.2 组件依赖
+##### ② 组件依赖
 - UserDataProvider.vue - 用户数据提供者
 - RoleNavigationMenu.vue - 角色导航菜单
 
-### 2.2 认证组件 (auth/)
+### 2. 认证组件 (auth/)
 
-#### 2.2.1 LoginForm.vue
+#### 2.1. LoginForm.vue
 
-##### 2.2.1.1 组件概述
+##### ① 组件概述
 登录表单组件，处理用户登录逻辑。
 
-##### 2.2.1.2 数据结构
+##### ② 数据结构
 ```javascript
 const form = reactive({
   username: '',
@@ -227,7 +227,7 @@ const isSubmitting = ref(false)
 const loginError = ref('')
 ```
 
-##### 2.2.1.3 方法详解
+##### ③ 方法详解
 | 方法名 | 参数 | 返回值 | 功能描述 |
 |--------|------|--------|----------|
 | `validateUsername()` | 无 | Boolean | 验证用户名是否有效 |
@@ -235,25 +235,25 @@ const loginError = ref('')
 | `validateForm()` | 无 | Boolean | 验证整个表单是否有效 |
 | `submitForm()` | 无 | 无 | 提交表单并处理登录逻辑 |
 
-##### 2.2.1.4 事件
+##### ④ 事件
 - `@login` - 登录成功后触发，传递用户信息和主页路径
 
-##### 2.2.1.5 外部依赖
+##### ⑤ 外部依赖
 ```javascript
 import { authenticateUser, getHomePageByRole } from '@/utils/mockUsers'
 ```
 
-#### 2.2.2 RegisterForm.vue
+#### 2.2. RegisterForm.vue
 
-##### 2.2.2.1 组件概述
+##### ① 组件概述
 注册表单组件，处理用户注册逻辑。
 
-#### 2.2.3 UserDataProvider.vue
+#### 2.3. UserDataProvider.vue
 
-##### 2.2.3.1 组件概述
+##### ① 组件概述
 用户数据提供组件，从持久化存储中获取用户信息。
 
-##### 2.2.3.2 数据结构
+##### ② 数据结构
 ```javascript
 const userData = reactive({
   id: 0,
@@ -263,7 +263,7 @@ const userData = reactive({
 })
 ```
 
-##### 2.2.3.3 生命周期钩子
+##### ③ 生命周期钩子
 ```javascript
 onMounted(() => {
   // 从持久化存储获取用户数据
@@ -275,14 +275,14 @@ onMounted(() => {
 })
 ```
 
-### 2.3 工具函数 (utils/)
+### 2.4 工具函数 (utils/)
 
-#### 2.3.1 mockUsers.js
+#### 2.4.1 mockUsers.js
 
-##### 2.3.1.1 文件概述
+##### ① 文件概述
 提供模拟用户数据和相关功能函数。
 
-##### 2.3.1.2 数据结构
+##### ② 数据结构
 ```javascript
 const users = [
   {
@@ -309,14 +309,14 @@ const users = [
 ]
 ```
 
-##### 2.3.1.3 函数详解
+##### ③ 函数详解
 | 函数名 | 参数 | 返回值 | 功能描述 |
 |--------|------|--------|----------|
 | `authenticateUser(username, password)` | username: String, password: String | Object/null | 验证用户凭据并返回用户信息 |
 | `getHomePageByRole(role)` | role: String | String | 根据用户角色获取默认主页路径 |
 
-##### 2.3.1.4 函数实现
-###### 2.3.1.4.1 authenticateUser()
+##### ④ 函数实现
+###### i. authenticateUser()
 ```javascript
 export function authenticateUser(username, password) {
   const user = users.find(u => u.username === username && u.password === password)
@@ -324,7 +324,7 @@ export function authenticateUser(username, password) {
 }
 ```
 
-###### 2.3.1.4.2 getHomePageByRole()
+###### ii. getHomePageByRole()
 ```javascript
 export function getHomePageByRole(role) {
   switch (role) {
@@ -340,19 +340,19 @@ export function getHomePageByRole(role) {
 }
 ```
 
-### 2.4 首页组件 (home/)
+### 2.5 首页组件 (home/)
 
-#### 2.4.1 UserFeatureGrid.vue
+#### 2.5.1 UserFeatureGrid.vue
 
-##### 2.4.1.1 组件概述
+##### ① 组件概述
 根据用户角色显示不同的功能卡片。
 
-##### 2.4.1.2 Props
+##### ② Props
 | 名称 | 类型 | 默认值 | 描述 |
 |------|------|--------|------|
 | `userRole` | String | 'guest' | 用户角色 |
 
-##### 2.4.1.3 数据结构
+##### ③ 数据结构
 ```javascript
 data() {
   return {
@@ -387,7 +387,7 @@ data() {
 }
 ```
 
-##### 2.4.1.4 计算属性
+##### ④ 计算属性
 ```javascript
 computed: {
   features() {
@@ -401,19 +401,19 @@ computed: {
 }
 ```
 
-### 2.5 导航组件 (navigation/)
+### 2.6 导航组件 (navigation/)
 
-#### 2.5.1 RoleNavigationMenu.vue
+#### 2.6.1 RoleNavigationMenu.vue
 
-##### 2.5.1.1 组件概述
+##### ① 组件概述
 根据用户角色显示不同的侧边栏导航菜单。
 
-##### 2.5.1.2 Props
+##### ② Props
 | 名称 | 类型 | 默认值 | 描述 |
 |------|------|--------|------|
 | `userRole` | String | 'guest' | 用户角色 |
 
-##### 2.5.1.3 计算属性
+##### ③ 计算属性
 ```javascript
 computed: {
   navigationItems() {
