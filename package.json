@@ -5,7 +5,8 @@
   "scripts": {
     "serve": "vue-cli-service serve",
     "build": "vue-cli-service build",
-    "lint": "vue-cli-service lint"
+    "lint": "vue-cli-service lint",
+    "generate:api": "openapi-generator-cli generate -i swagger.json -g javascript-axios -o ./src/api --additional-properties=supportsES6=true,usePromises=true"
   },
   "dependencies": {
     "axios": "^1.9.0",
@@ -16,6 +17,7 @@
   "devDependencies": {
     "@babel/core": "^7.12.16",
     "@babel/eslint-parser": "^7.12.16",
+    "@openapitools/openapi-generator-cli": "^2.20.0",
     "@vue/cli-plugin-babel": "~5.0.0",
     "@vue/cli-plugin-eslint": "~5.0.0",
     "@vue/cli-service": "~5.0.0",
