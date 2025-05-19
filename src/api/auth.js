@@ -1,4 +1,4 @@
-import request from './index';
+import request, { requestWithToken } from './index';
 
 /**
  * 用户登录
@@ -8,10 +8,28 @@ import request from './index';
  * @returns {Promise}
  */
 export function login(data) {
+  console.log(`尝试登录: ${data.username}`);
   return request({
     url: '/api/auth/login',
     method: 'post',
-    data
+    data,
+    transformResponse: [
+      (data) => {
+        // 尝试解析响应数据
+        try {
+          const response = JSON.parse(data);
+          if (response && response.tokens && response.tokens.accessToken) {
+            console.log(`登录成功，token长度: ${response.tokens.accessToken.length}`);
+          } else {
+            console.warn('登录响应缺少token信息');
+          }
+          return response;
+        } catch (e) {
+          console.error('解析登录响应失败:', e);
+          return data;
+        }
+      }
+    ]
   });
 }
 
@@ -35,25 +53,39 @@ export function refreshToken(data) {
  * @param {string} data.username - 用户名
  * @param {string} data.oldPassword - 旧密码
  * @param {string} data.newPassword - 新密码
+ * @param {string} [token] - 可选的认证token
  * @returns {Promise}
  */
-export function changePassword(data) {
-  return request({
+export function changePassword(data, token) {
+  const requestConfig = {
     url: '/api/auth/change-password',
     method: 'put',
     data
-  });
+  };
+  
+  if (token) {
+    return requestWithToken(token)(requestConfig);
+  }
+  
+  return request(requestConfig);
 }
 
 /**
  * 检查用户名是否可用
  * @param {string} username - 用户名
+ * @param {string} [token] - 可选的认证token
  * @returns {Promise}
  */
-export function checkAvailableUsername(username) {
-  return request({
+export function checkAvailableUsername(username, token) {
+  const requestConfig = {
     url: '/api/auth/check-available-username',
     method: 'get',
     params: { username }
-  });
+  };
+  
+  if (token) {
+    return requestWithToken(token)(requestConfig);
+  }
+  
+  return request(requestConfig);
 } 

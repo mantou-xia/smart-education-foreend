@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { cleanRedundantAuth } from '@/utils/auth'
 
 // 导入路由视图组件
 import Home from '../views/Home.vue'
@@ -140,19 +141,84 @@ const router = createRouter({
 
 // 路由守卫，检查用户登录状态和权限
 router.beforeEach((to, from, next) => {
+  console.log(`路由守卫: 从 ${from.path} 到 ${to.path}`);
+  
+  // 每次路由导航时清理冗余认证信息
+  cleanRedundantAuth();
+  
   const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true'
+  console.log('路由守卫: 登录状态:', isLoggedIn);
+  
+  // 检查token状态
+  const token = localStorage.getItem('access_token');
+  const refreshToken = localStorage.getItem('refresh_token');
+  
+  if (token) {
+    console.log('路由守卫: 已检测到token');
+  }
+  
+  if (refreshToken && !isLoggedIn) {
+    console.warn('异常情况: 检测到refreshToken但用户未登录，清除token');
+    // 清除意外残留的token
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    localStorage.removeItem('user_info');
+  }
+  
   let userData = null
   
-  // 尝试获取用户数据
+  // 尝试获取用户数据（支持两种可能的键名）
   try {
+    // 首先尝试从userData获取
     userData = JSON.parse(localStorage.getItem('userData'))
+    
+    // 如果不存在，尝试从user_info获取
+    if (!userData) {
+      const userInfo = JSON.parse(localStorage.getItem('user_info'))
+      if (userInfo) {
+        // 从user_info中提取角色信息
+        let role = 'student' // 默认角色
+        if (userInfo.roles && userInfo.roles.length > 0) {
+          // 处理可能的角色格式 "ROLE_XXX"
+          const roleStr = String(userInfo.roles[0]).toUpperCase()
+          if (roleStr.includes('TEACHER')) {
+            role = 'teacher'
+          } else if (roleStr.includes('STUDENT')) {
+            role = 'student'
+          } else if (roleStr.includes('ADMIN')) {
+            role = 'admin'
+          }
+        } else if (userInfo.userType) {
+          // 尝试使用userType字段
+          role = userInfo.userType
+        }
+        
+        userData = {
+          username: userInfo.username,
+          role: role
+        }
+        
+        // 同步保存到userData键，确保一致性
+        localStorage.setItem('userData', JSON.stringify(userData))
+      }
+    }
   } catch (e) {
     console.error('无法解析用户数据', e)
   }
   
+  // 如果路径是登录页或注册页，直接放行
+  if (to.name === 'Login' || to.name === 'Register') {
+    console.log('路由守卫: 前往登录/注册页面，直接放行');
+    next();
+    return;
+  }
+  
+  console.log('路由守卫检查用户数据:', userData)
+  
   // 需要登录的路由
   if (to.matched.some(record => record.meta.requiresAuth)) {
     if (!isLoggedIn || !userData) {
+      console.log('用户未登录或数据无效，重定向到登录页')
       next({ name: 'Login' })
       return
     }
@@ -168,8 +234,11 @@ router.beforeEach((to, from, next) => {
       return Array.isArray(record.meta.role) && record.meta.role.includes(userData.role)
     })
     
+    console.log('角色权限检查:', hasRoleAccess, '用户角色:', userData.role)
+    
     if (!hasRoleAccess) {
       // 用户没有权限访问该页面，重定向到对应角色的默认页面
+      console.log('用户无权限访问此路由，重定向到角色默认页面')
       switch(userData.role) {
         case 'admin':
           next({ name: 'AdminDashboard' })

@@ -12,6 +12,7 @@
 <script>
 import { reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { clearAuth } from '@/utils/auth'
 
 export default {
   name: 'UserInfo',
@@ -41,9 +42,31 @@ export default {
     // 从localStorage读取用户信息
     onMounted(() => {
       try {
+        // 获取用户数据
         const storedUserData = JSON.parse(localStorage.getItem('userData'))
         if (storedUserData) {
+          console.log('从localStorage读取到userData:', storedUserData)
           Object.assign(userData, storedUserData)
+        }
+        
+        // 检查用户信息对象
+        const userInfo = localStorage.getItem('user_info')
+        if (userInfo) {
+          console.log('从localStorage读取到user_info:', JSON.parse(userInfo))
+        } else {
+          console.warn('localStorage中没有user_info')
+        }
+        
+        // 确保name属性有值，否则使用username
+        if (!userData.name && userData.username) {
+          userData.name = userData.username
+        }
+        
+        // 确保role属性格式正确（去除可能的ROLE_前缀）
+        if (userData.role && userData.role.toUpperCase().startsWith('ROLE_')) {
+          const roleName = userData.role.substring(5).toLowerCase()
+          console.log(`检测到角色前缀ROLE_，将${userData.role}转换为${roleName}`)
+          userData.role = roleName
         }
       } catch (e) {
         console.error('无法解析用户数据', e)
@@ -51,12 +74,9 @@ export default {
     })
     
     const logout = () => {
-      // 清除登录状态
-      localStorage.removeItem('isLoggedIn')
-      
-      // 清除其他可能存在的用户信息
-      localStorage.removeItem('userData')
-      localStorage.removeItem('token')
+      // 使用clearAuth函数清除所有认证信息
+      clearAuth()
+      console.log('已清除所有认证信息，准备跳转到登录页')
       
       // 跳转到登录页
       router.push('/auth/login')

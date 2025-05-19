@@ -7,6 +7,8 @@
 </template>
 
 <script>
+import { clearAuth } from '@/utils/auth'
+
 export default {
   name: 'TeacherDashboard',
   data() {
@@ -25,6 +27,16 @@ export default {
       }
     } catch (e) {
       console.error('无法解析用户数据', e)
+      this.$router.push({ name: 'Login' })
+    }
+  },
+  methods: {
+    handleLogout() {
+      // 使用clearAuth函数清除所有认证信息
+      clearAuth()
+      console.log('已清除所有认证信息，准备跳转到登录页')
+      
+      // 重定向到登录页
       this.$router.push({ name: 'Login' })
     }
   }

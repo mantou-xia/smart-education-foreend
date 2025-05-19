@@ -1,27 +1,44 @@
-import request from './index';
+import request, { requestWithToken } from './index';
+// import { getToken } from '../utils/auth';
 
 /**
  * 获取教师信息
  * @param {number} id - 教师ID
+ * @param {string} [token] - 可选的认证token
  * @returns {Promise}
  */
-export function getTeacherById(id) {
-  return request({
+export function getTeacherById(id, token) {
+  const requestConfig = {
     url: `/api/teacher/${id}`,
     method: 'get'
-  });
+  };
+  
+  if (token) {
+    return requestWithToken(token)(requestConfig);
+  }
+  
+  return request(requestConfig);
 }
 
 /**
  * 通过用户名获取教师信息
  * @param {string} username - 用户名
+ * @param {string} [token] - 可选的认证token
  * @returns {Promise}
  */
-export function getTeacherByUsername(username) {
-  return request({
+export function getTeacherByUsername(username, token) {
+  const requestConfig = {
     url: `/api/teacher/username/${username}`,
-    method: 'get'
-  });
+    method: 'get',
+    retry: 3,  // 增加重试次数
+    retryDelay: 1000  // 增加重试延迟
+  };
+  
+  if (token) {
+    return requestWithToken(token)(requestConfig);
+  }
+  
+  return request(requestConfig);
 }
 
 /**
@@ -45,12 +62,19 @@ export function registerTeacher(data) {
 /**
  * 更新教师信息
  * @param {Object} data - 教师更新信息
+ * @param {string} [token] - 可选的认证token
  * @returns {Promise}
  */
-export function updateTeacher(data) {
-  return request({
+export function updateTeacher(data, token) {
+  const requestConfig = {
     url: '/api/teacher/update',
     method: 'put',
     data
-  });
+  };
+  
+  if (token) {
+    return requestWithToken(token)(requestConfig);
+  }
+  
+  return request(requestConfig);
 } 

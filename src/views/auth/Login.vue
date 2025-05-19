@@ -27,9 +27,21 @@ export default {
     
     const handleLogin = (data) => {
       console.log('登录成功:', data.user)
+      console.log('跳转路径:', data.homePage)
       
       // 根据用户角色跳转到不同的首页
-      router.push(data.homePage)
+      try {
+        router.push(data.homePage)
+          .then(() => {
+            console.log('路由跳转成功')
+          })
+          .catch(err => {
+            console.error('路由跳转失败:', err)
+            alert('页面跳转失败，请检查路由配置')
+          })
+      } catch (error) {
+        console.error('路由跳转异常:', error)
+      }
     }
     
     return {

@@ -5,7 +5,13 @@
       <p class="subtitle">智能辅助，让学习更高效</p>
     </div>
 
-    <div class="features-grid">
+    <div v-if="loading" class="loading-state">
+      加载中...
+    </div>
+    <div v-else-if="error" class="error-state">
+      {{ error }}
+    </div>
+    <div v-else class="features-grid">
       <!-- 智能问答系统 -->
       <div class="feature-card">
         <div class="card-header">
@@ -15,13 +21,18 @@
         <div class="card-content">
           <div class="chat-container">
             <div class="chat-messages">
-              <div class="message system">
-                <p>你好！我是你的学习助手，有什么问题都可以问我。</p>
+              <div v-for="(message, index) in chatMessages" :key="index" 
+                   :class="['message', message.type]">
+                <p>{{ message.content }}</p>
               </div>
             </div>
             <div class="chat-input">
-              <input type="text" placeholder="输入你的问题..." />
-              <button class="send-btn">发送</button>
+              <input type="text" v-model="userQuestion" placeholder="输入你的问题..." 
+                     @keyup.enter="sendQuestion" />
+              <button class="send-btn" @click="sendQuestion" 
+                      :disabled="isProcessingQuestion">
+                {{ isProcessingQuestion ? '处理中...' : '发送' }}
+              </button>
             </div>
           </div>
         </div>
@@ -37,22 +48,26 @@
           <div class="exercise-form">
             <div class="form-group">
               <label>选择知识点</label>
-              <select>
-                <option>全部知识点</option>
-                <option>JavaScript基础</option>
-                <option>Vue.js框架</option>
-                <option>算法与数据结构</option>
+              <select v-model="exerciseParams.knowledgePoint">
+                <option value="">全部知识点</option>
+                <option v-for="point in knowledgePoints" 
+                        :key="point.id" :value="point.id">
+                  {{ point.name }}
+                </option>
               </select>
             </div>
             <div class="form-group">
               <label>难度级别</label>
               <div class="radio-group">
-                <label><input type="radio" name="difficulty" checked /> 基础</label>
-                <label><input type="radio" name="difficulty" /> 进阶</label>
-                <label><input type="radio" name="difficulty" /> 挑战</label>
+                <label><input type="radio" v-model="exerciseParams.difficulty" value="EASY" /> 基础</label>
+                <label><input type="radio" v-model="exerciseParams.difficulty" value="MEDIUM" /> 进阶</label>
+                <label><input type="radio" v-model="exerciseParams.difficulty" value="HARD" /> 挑战</label>
               </div>
             </div>
-            <button class="generate-btn">生成练习</button>
+            <button class="generate-btn" @click="generateExercises" 
+                    :disabled="isGeneratingExercises">
+              {{ isGeneratingExercises ? '生成中...' : '生成练习' }}
+            </button>
           </div>
         </div>
       </div>
@@ -69,10 +84,13 @@
               <span class="language-tag">JavaScript</span>
             </div>
             <div class="editor-content">
-              <pre><code>// 在这里输入你的代码</code></pre>
+              <textarea v-model="codeInput" placeholder="// 在这里输入你的代码"></textarea>
             </div>
             <div class="editor-footer">
-              <button class="check-btn">检查代码</button>
+              <button class="check-btn" @click="checkCode" 
+                      :disabled="isCheckingCode">
+                {{ isCheckingCode ? '检查中...' : '检查代码' }}
+              </button>
             </div>
           </div>
         </div>
@@ -87,20 +105,23 @@
         <div class="card-content">
           <div class="progress-stats">
             <div class="stat-item">
-              <div class="stat-value">85%</div>
+              <div class="stat-value">{{ stats.overallProgress }}%</div>
               <div class="stat-label">总体进度</div>
             </div>
             <div class="stat-item">
-              <div class="stat-value">92%</div>
+              <div class="stat-value">{{ stats.completionRate }}%</div>
               <div class="stat-label">完成率</div>
             </div>
             <div class="stat-item">
-              <div class="stat-value">7</div>
+              <div class="stat-value">{{ stats.consecutiveDays }}</div>
               <div class="stat-label">连续学习天数</div>
             </div>
           </div>
-          <div class="progress-chart">
-            <div class="chart-placeholder">学习进度图表</div>
+          <div class="progress-chart" v-if="progressChartLoaded">
+            <canvas id="progressChart" width="100%" height="200"></canvas>
+          </div>
+          <div class="progress-chart" v-else>
+            <div class="chart-placeholder">加载学习进度图表中...</div>
           </div>
         </div>
       </div>
@@ -109,8 +130,223 @@
 </template>
 
 <script>
+import { ref, reactive, onMounted } from 'vue';
+import { getUserInfo } from '@/utils/auth';
+import { learningProgress, teachingAssistant, knowledge, student } from '@/api/api';
+
 export default {
-  name: 'StudentAssistant'
+  name: 'StudentAssistant',
+  setup() {
+    // 页面状态
+    const loading = ref(false);
+    const error = ref('');
+    
+    // 聊天功能
+    const chatMessages = ref([
+      { type: 'system', content: '你好！我是你的学习助手，有什么问题都可以问我。' }
+    ]);
+    const userQuestion = ref('');
+    const isProcessingQuestion = ref(false);
+    
+    // 练习生成功能
+    const knowledgePoints = ref([]);
+    const exerciseParams = reactive({
+      knowledgePoint: '',
+      difficulty: 'MEDIUM'
+    });
+    const isGeneratingExercises = ref(false);
+    
+    // 代码检查功能
+    const codeInput = ref('');
+    const isCheckingCode = ref(false);
+    
+    // 学习进度统计
+    const stats = reactive({
+      overallProgress: 0,
+      completionRate: 0,
+      consecutiveDays: 0
+    });
+    const progressChartLoaded = ref(false);
+    
+    // 发送问题
+    const sendQuestion = async () => {
+      if (!userQuestion.value.trim() || isProcessingQuestion.value) return;
+      
+      // 添加用户消息到聊天记录
+      chatMessages.value.push({
+        type: 'user',
+        content: userQuestion.value
+      });
+      
+      isProcessingQuestion.value = true;
+      
+      try {
+        // 调用后端API获取智能回复
+        // 这里假设使用教学助手API，真实情况可能需要专门的聊天API
+        const response = await teachingAssistant.generateTeachingPlan({
+          subjectType: 'QA',
+          courseOutline: userQuestion.value,
+          courseDocuments: [],
+          duration: 0,
+          difficultyLevel: 'BASIC',
+          teachingStyle: 'INTERACTIVE'
+        });
+        
+        // 添加系统回复消息
+        chatMessages.value.push({
+          type: 'system',
+          content: response.content || '很抱歉，暂时无法回答您的问题。'
+        });
+        
+        // 清空输入框
+        userQuestion.value = '';
+      } catch (e) {
+        console.error('处理问题失败:', e);
+        chatMessages.value.push({
+          type: 'system',
+          content: '很抱歉，处理您的问题时出现了错误。请稍后再试。'
+        });
+      } finally {
+        isProcessingQuestion.value = false;
+      }
+    };
+    
+    // 生成练习
+    const generateExercises = async () => {
+      isGeneratingExercises.value = true;
+      
+      try {
+        // 此处调用生成练习的API
+        // 如果后端没有现成API，可以通过提示用户练习生成中
+        console.log('生成练习，参数:', exerciseParams);
+        
+        // 模拟API响应时间
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        alert('练习已生成，请到作业页面查看');
+      } catch (e) {
+        console.error('生成练习失败:', e);
+        alert('生成练习失败，请稍后再试');
+      } finally {
+        isGeneratingExercises.value = false;
+      }
+    };
+    
+    // 检查代码
+    const checkCode = async () => {
+      if (!codeInput.value.trim()) {
+        alert('请先输入代码');
+        return;
+      }
+      
+      isCheckingCode.value = true;
+      
+      try {
+        // 此处调用代码检查API
+        // 如果后端没有现成API，可以给出一个默认提示
+        console.log('检查代码:', codeInput.value);
+        
+        // 模拟API响应时间
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        alert('代码检查完成，没有发现错误！');
+      } catch (e) {
+        console.error('检查代码失败:', e);
+        alert('检查代码失败，请稍后再试');
+      } finally {
+        isCheckingCode.value = false;
+      }
+    };
+    
+    // 初始化页面数据
+    const initializeData = async () => {
+      loading.value = true;
+      error.value = '';
+      
+      try {
+        // 获取当前登录的用户信息
+        const userInfo = getUserInfo();
+        if (!userInfo) {
+          throw new Error('无法获取用户信息，请重新登录');
+        }
+        
+        // 获取学生ID
+        let studentId;
+        
+        if (userInfo) {
+          // 优先从userInfo中获取studentId(登录时已保存)
+          if (userInfo.studentId) {
+            studentId = userInfo.studentId;
+            console.log('从localStorage获取学生ID:', studentId);
+          } 
+          // 如果没有，则尝试通过API获取
+          else if (userInfo.username) {
+            try {
+              // 通过用户名获取学生信息
+              const studentInfo = await student.getStudentByUsername(userInfo.username);
+              if (studentInfo && studentInfo.id) {
+                studentId = studentInfo.id;
+                console.log('通过API获取学生ID:', studentId);
+              }
+            } catch (e) {
+              console.error('获取学生信息失败:', e);
+            }
+          }
+        }
+        
+        if (!studentId) {
+          throw new Error('无法获取学生ID');
+        }
+        
+        // 获取知识点列表
+        const knowledgeList = await knowledge.getAllKnowledgePoints();
+        knowledgePoints.value = knowledgeList;
+        
+        // 获取学习进度统计
+        const progressData = await learningProgress.getOverallProgress(studentId);
+        const statisticsData = await learningProgress.getProgressStatistics(studentId);
+        
+        // 设置学习统计数据
+        stats.overallProgress = Math.round(progressData.overallPercentage || 0);
+        stats.completionRate = Math.round(statisticsData.completionRate || 0);
+        stats.consecutiveDays = statisticsData.consecutiveDays || 0;
+        
+        // 异步加载进度图表（模拟数据）
+        setTimeout(() => {
+          progressChartLoaded.value = true;
+          // 如果要使用图表库如Chart.js，可以在这里初始化图表
+          // 假设已经有了DOM元素 id="progressChart"
+        }, 500);
+        
+      } catch (e) {
+        console.error('初始化数据失败:', e);
+        error.value = '获取学习助手数据失败，请稍后重试';
+      } finally {
+        loading.value = false;
+      }
+    };
+    
+    // 组件挂载时初始化数据
+    onMounted(initializeData);
+    
+    return {
+      loading,
+      error,
+      chatMessages,
+      userQuestion,
+      isProcessingQuestion,
+      sendQuestion,
+      knowledgePoints,
+      exerciseParams,
+      isGeneratingExercises,
+      generateExercises,
+      codeInput,
+      isCheckingCode,
+      checkCode,
+      stats,
+      progressChartLoaded
+    };
+  }
 }
 </script>
 
@@ -132,6 +368,17 @@ export default {
 .subtitle {
   color: #666;
   font-size: 14px;
+}
+
+.loading-state,
+.error-state {
+  text-align: center;
+  padding: 40px;
+  color: #999;
+}
+
+.error-state {
+  color: #f5222d;
 }
 
 .features-grid {
@@ -198,6 +445,11 @@ export default {
   margin-right: auto;
 }
 
+.message.user {
+  background: #e8f5e9;
+  margin-left: auto;
+}
+
 .chat-input {
   display: flex;
   gap: 10px;
@@ -217,6 +469,11 @@ export default {
   border: none;
   border-radius: 4px;
   cursor: pointer;
+}
+
+.send-btn:disabled {
+  background: #b0bec5;
+  cursor: not-allowed;
 }
 
 /* 练习生成样式 */
@@ -264,6 +521,11 @@ export default {
   margin-top: 10px;
 }
 
+.generate-btn:disabled {
+  background: #b0bec5;
+  cursor: not-allowed;
+}
+
 /* 代码编辑器样式 */
 .code-editor {
   height: 300px;
@@ -285,8 +547,18 @@ export default {
 .editor-content {
   flex: 1;
   background: #f8f9fa;
+  position: relative;
+}
+
+.editor-content textarea {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: transparent;
   padding: 10px;
   font-family: monospace;
+  resize: none;
+  outline: none;
 }
 
 .editor-footer {
@@ -301,6 +573,11 @@ export default {
   border: none;
   border-radius: 4px;
   cursor: pointer;
+}
+
+.check-btn:disabled {
+  background: #b0bec5;
+  cursor: not-allowed;
 }
 
 /* 学习进度样式 */

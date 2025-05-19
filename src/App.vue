@@ -25,12 +25,38 @@
 import AppHeader from '@/components/layout/AppHeader.vue';
 import ContentHeader from '@/components/layout/ContentHeader.vue';
 import SideBar from './components/layout/SideBar.vue';
+import { cleanRedundantAuth } from './utils/auth';
+
 export default {
   name: 'App',
   components: {
     AppHeader,
     SideBar,
     ContentHeader
+  },
+  created() {
+    // 清理冗余认证信息
+    cleanRedundantAuth();
+    
+    // 检查localStorage中的token状态是否与登录状态一致
+    const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+    const token = localStorage.getItem('access_token');
+    const refreshToken = localStorage.getItem('refresh_token');
+    
+    // 记录当前Token状态，便于调试
+    console.log('应用初始化时Token状态:', { 
+      isLoggedIn, 
+      hasAccessToken: !!token,
+      hasRefreshToken: !!refreshToken
+    });
+    
+    // 异常处理：发现token但用户未登录，清除多余token
+    if ((token || refreshToken) && !isLoggedIn) {
+      console.warn('检测到异常Token状态: 存在token但用户未登录');
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
+      console.log('已清除冗余token');
+    }
   }
 }
 </script>

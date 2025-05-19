@@ -1,4 +1,5 @@
-import request from './index';
+import request, { requestWithToken } from './index';
+// import { getToken } from '../utils/auth';
 
 /**
  * 获取学生信息
@@ -15,13 +16,28 @@ export function getStudentById(studentId) {
 /**
  * 通过用户名获取学生信息
  * @param {string} username - 用户名
+ * @param {string} [token] - 可选的认证token
  * @returns {Promise}
  */
-export function getStudentByUsername(username) {
-  return request({
-    url: `/api/student/username/${username}`,
-    method: 'get'
-  });
+export function getStudentByUsername(username, token) {
+  // 根据后端控制器代码，正确的路径应为: /api/student/username/{username}
+  const requestConfig = {
+    url: `/api/student/username/${encodeURIComponent(username)}`,
+    method: 'get',
+    retry: 3,  // 增加重试次数
+    retryDelay: 1000,  // 增加重试延迟
+  };
+  
+  console.log(`尝试获取学生信息，用户名: ${username}，URL: ${requestConfig.url}`);
+  
+  // 如果提供了token，使用requestWithToken
+  if (token) {
+    console.log(`使用提供的token获取学生信息: ${username}`);
+    return requestWithToken(token)(requestConfig);
+  }
+  
+  // 使用默认token
+  return request(requestConfig);
 }
 
 /**
