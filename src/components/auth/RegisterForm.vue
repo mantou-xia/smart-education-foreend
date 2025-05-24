@@ -10,6 +10,7 @@
           placeholder="请输入用户名"
           :class="{ 'input-error': errors.username }"
           @blur="validateUsername"
+          :disabled="isSubmittingProp"
         />
         <div v-if="errors.username" class="error-message">{{ errors.username }}</div>
       </div>
@@ -23,9 +24,38 @@
           placeholder="请输入邮箱"
           :class="{ 'input-error': errors.email }"
           @blur="validateEmail"
+          :disabled="isSubmittingProp"
         />
         <div v-if="errors.email" class="error-message">{{ errors.email }}</div>
       </div>
+    </div>
+    
+    <div class="form-group">
+      <label for="fullName">姓名</label>
+      <input
+        id="fullName"
+        v-model="form.fullName"
+        type="text"
+        placeholder="请输入姓名"
+        :class="{ 'input-error': errors.fullName }"
+        @blur="validateFullName"
+        :disabled="isSubmittingProp"
+      />
+      <div v-if="errors.fullName" class="error-message">{{ errors.fullName }}</div>
+    </div>
+    
+    <div class="form-group">
+      <label for="phone">手机号</label>
+      <input
+        id="phone"
+        v-model="form.phone"
+        type="text"
+        placeholder="请输入手机号"
+        :class="{ 'input-error': errors.phone }"
+        @blur="validatePhone"
+        :disabled="isSubmittingProp"
+      />
+      <div v-if="errors.phone" class="error-message">{{ errors.phone }}</div>
     </div>
     
     <div class="form-group">
@@ -35,6 +65,7 @@
         v-model="form.role"
         :class="{ 'input-error': errors.role }"
         @blur="validateRole"
+        :disabled="isSubmittingProp"
       >
         <option value="">请选择角色</option>
         <option value="student">学生</option>
@@ -54,8 +85,9 @@
             placeholder="请输入密码"
             :class="{ 'input-error': errors.password }"
             @blur="validatePassword"
+            :disabled="isSubmittingProp"
           />
-          <button type="button" class="toggle-password" @click="showPassword = !showPassword">
+          <button type="button" class="toggle-password" @click="showPassword = !showPassword" :disabled="isSubmittingProp">
             {{ showPassword ? '隐藏' : '显示' }}
           </button>
         </div>
@@ -71,6 +103,7 @@
           placeholder="请再次输入密码"
           :class="{ 'input-error': errors.confirmPassword }"
           @blur="validateConfirmPassword"
+          :disabled="isSubmittingProp"
         />
         <div v-if="errors.confirmPassword" class="error-message">{{ errors.confirmPassword }}</div>
       </div>
@@ -82,28 +115,39 @@
           type="checkbox" 
           v-model="form.agreement"
           @change="validateAgreement"
+          :disabled="isSubmittingProp"
         />
         <span>我已阅读并同意<a href="#" class="terms-link">用户协议</a>和<a href="#" class="terms-link">隐私政策</a></span>
       </label>
       <div v-if="errors.agreement" class="error-message agreement-error">{{ errors.agreement }}</div>
     </div>
     
-    <button type="submit" class="btn btn-primary btn-block" :disabled="isSubmitting">
-      {{ isSubmitting ? '注册中...' : '注册' }}
+    <button type="submit" class="btn btn-primary btn-block" :disabled="isSubmittingProp">
+      {{ isSubmittingProp ? '注册中...' : '注册' }}
     </button>
   </form>
 </template>
 
 <script>
-import { ref, reactive } from 'vue'
+import { ref, reactive, toRefs } from 'vue'
 
 export default {
   name: 'RegisterForm',
+  props: {
+    isSubmitting: {
+      type: Boolean,
+      default: false
+    }
+  },
   emits: ['register'],
   setup(props, { emit }) {
+    const { isSubmitting: isSubmittingProp } = toRefs(props)
+
     const form = reactive({
       username: '',
       email: '',
+      fullName: '',
+      phone: '',
       role: '',
       password: '',
       confirmPassword: '',
@@ -113,6 +157,8 @@ export default {
     const errors = reactive({
       username: '',
       email: '',
+      fullName: '',
+      phone: '',
       role: '',
       password: '',
       confirmPassword: '',
@@ -120,7 +166,6 @@ export default {
     })
     
     const showPassword = ref(false)
-    const isSubmitting = ref(false)
     
     const validateUsername = () => {
       if (!form.username) {
@@ -146,6 +191,29 @@ export default {
         return false
       }
       errors.email = ''
+      return true
+    }
+    
+    const validateFullName = () => {
+      if (!form.fullName) {
+        errors.fullName = '请输入姓名'
+        return false
+      }
+      errors.fullName = ''
+      return true
+    }
+    
+    const validatePhone = () => {
+      if (!form.phone) {
+        errors.phone = '请输入手机号'
+        return false
+      }
+      const phonePattern = /^1[3-9]\d{9}$/;
+      if (!phonePattern.test(form.phone)) {
+        errors.phone = '请输入有效的手机号'
+        return false
+      }
+      errors.phone = ''
       return true
     }
     
@@ -197,6 +265,8 @@ export default {
       const validations = [
         validateUsername(),
         validateEmail(),
+        validateFullName(),
+        validatePhone(),
         validateRole(),
         validatePassword(),
         validateConfirmPassword(),
@@ -206,20 +276,16 @@ export default {
     }
     
     const submitForm = () => {
-      if (validateForm()) {
-        isSubmitting.value = true
-        
-        // 模拟异步注册操作
-        setTimeout(() => {
-          const userData = {
-            username: form.username,
-            email: form.email,
-            role: form.role,
-            password: form.password
-          }
-          emit('register', userData)
-          isSubmitting.value = false
-        }, 1500)
+      if (validateForm() && !isSubmittingProp.value) {
+        const userData = {
+          username: form.username,
+          email: form.email,
+          fullName: form.fullName,
+          phone: form.phone,
+          role: form.role,
+          password: form.password
+        }
+        emit('register', userData)
       }
     }
     
@@ -227,9 +293,11 @@ export default {
       form,
       errors,
       showPassword,
-      isSubmitting,
+      isSubmittingProp,
       validateUsername,
       validateEmail,
+      validateFullName,
+      validatePhone,
       validateRole,
       validatePassword,
       validateConfirmPassword,

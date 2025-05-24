@@ -5,8 +5,12 @@
       <p>加入我们的学习平台</p>
     </div>
     
-    <register-form @register="handleRegister" />
+    <register-form @register="handleRegister" :is-submitting="isRegistering" />
     
+    <div v-if="registrationError" class="error-message-global">
+      {{ registrationError }}
+    </div>
+
     <div class="register-footer">
       <p>已有账号？ <router-link to="/auth/login">立即登录</router-link></p>
     </div>
@@ -16,6 +20,8 @@
 <script>
 import RegisterForm from '@/components/auth/RegisterForm.vue'
 import { useRouter } from 'vue-router'
+import { ref } from 'vue'
+import { registerTeacher, registerStudent } from '@/api/auth' // 导入API
 
 export default {
   name: 'RegisterView',
@@ -24,17 +30,59 @@ export default {
   },
   setup() {
     const router = useRouter()
+    const isRegistering = ref(false)
+    const registrationError = ref('')
     
-    const handleRegister = (userData) => {
-      // 这里应该调用注册API
-      console.log('注册信息:', userData)
+    const handleRegister = async (userData) => {
+      isRegistering.value = true
+      registrationError.value = ''
       
-      // 模拟注册成功，跳转到登录页
-      router.push('/auth/login')
+      // 从 RegisterForm.vue 传递过来的 userData 包含: username, email, role, password
+      // API 可能需要 fullname 和 phone, 但当前表单未提供，这里仅使用已有数据
+      // 如果API强制要求 fullname 和 phone, 后续需要在 RegisterForm.vue 中添加这些字段
+      const apiPayload = {
+        username: userData.username,
+        password: userData.password,
+        email: userData.email,
+        fullName: userData.fullName,
+        phone: userData.phone,
+      };
+
+      try {
+        let response;
+        if (userData.role === 'teacher') {
+          console.log('尝试注册教师:', apiPayload);
+          response = await registerTeacher(apiPayload);
+        } else if (userData.role === 'student') {
+          console.log('尝试注册学生:', apiPayload);
+          response = await registerStudent(apiPayload);
+        } else {
+          registrationError.value = '无效的用户角色';
+          isRegistering.value = false;
+          return;
+        }
+        
+        console.log('注册成功:', response);
+        // 通常注册成功后，后端会返回token，前端可以保存token并导航
+        localStorage.setItem('accessToken', response.accessToken);
+        console.log('accessToken:', response.accessToken);
+        
+        alert('注册成功！即将跳转到登录页面。'); // 简单提示
+        router.push('/auth/login');
+
+      } catch (error) {
+        console.error('注册失败:', error);
+        // 根据实际错误响应显示更友好的提示
+        registrationError.value = error.response?.data?.message || error.message || '注册失败，请稍后再试。';
+      } finally {
+        isRegistering.value = false;
+      }
     }
     
     return {
-      handleRegister
+      handleRegister,
+      isRegistering,
+      registrationError
     }
   }
 }
@@ -63,6 +111,17 @@ export default {
 
 .register-header p {
   color: #666;
+}
+
+.error-message-global {
+  color: #f44336;
+  background-color: #ffebee;
+  border: 1px solid #f44336;
+  border-radius: 4px;
+  padding: 10px;
+  margin-bottom: 20px;
+  text-align: center;
+  font-size: 14px;
 }
 
 .register-footer {
