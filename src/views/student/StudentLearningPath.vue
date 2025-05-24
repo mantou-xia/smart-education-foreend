@@ -125,7 +125,7 @@
 
 <script>
 import { ref, onMounted } from 'vue';
-import { getUserInfo, getStudentInfo } from '@/utils/auth';
+import { getUserInfo } from '@/utils/auth';
 import { knowledge, learningProgress, course } from '@/api/api';
 import { student } from '@/api/api';
 
@@ -204,32 +204,23 @@ export default {
         // 获取学生ID
         let studentId;
         
-        // 优先从单独的学生信息中获取
-        const studentInfo = getStudentInfo();
-        if (studentInfo && studentInfo.id) {
-          studentId = studentInfo.id;
-          console.log('从学生信息缓存获取学生ID:', studentId);
-        }
-        // 尝试从用户信息中获取
-        else if (userInfo) {
-          // 从userInfo中获取studentId(登录时已保存)
-          if (userInfo.studentId) {
-            studentId = userInfo.studentId;
-            console.log('从用户缓存获取学生ID:', studentId);
-          } 
-          // 如果没有，则尝试通过API获取
-          else if (userInfo.username) {
-            try {
-              // 通过用户名获取学生信息
-              const apiStudentInfo = await student.getStudentByUsername(userInfo.username);
-              if (apiStudentInfo && apiStudentInfo.id) {
-                studentId = apiStudentInfo.id;
-                console.log('通过API获取学生ID:', studentId);
-              }
-            } catch (e) {
-              console.error('获取学生信息失败:', e);
+        // 直接通过API获取学生ID
+        if (userInfo && userInfo.username) {
+          try {
+            // 通过用户名获取学生信息
+            const apiStudentInfo = await student.getStudentByUsername(userInfo.username);
+            if (apiStudentInfo && apiStudentInfo.studentId) {
+              studentId = apiStudentInfo.studentId;
+              console.log('通过API获取学生ID:', studentId);
+            } else {
+              throw new Error('API返回的学生信息不完整');
             }
+          } catch (e) {
+            console.error('获取学生信息失败:', e);
+            throw new Error('无法通过API获取学生ID');
           }
+        } else {
+          throw new Error('无法获取用户名');
         }
         
         if (!studentId) {

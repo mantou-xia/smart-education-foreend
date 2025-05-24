@@ -273,25 +273,23 @@ export default {
         // 获取学生ID
         let studentId;
         
-        if (userInfo) {
-          // 优先从userInfo中获取studentId(登录时已保存)
-          if (userInfo.studentId) {
-            studentId = userInfo.studentId;
-            console.log('从localStorage获取学生ID:', studentId);
-          } 
-          // 如果没有，则尝试通过API获取
-          else if (userInfo.username) {
-            try {
-              // 通过用户名获取学生信息
-              const studentInfo = await student.getStudentByUsername(userInfo.username);
-              if (studentInfo && studentInfo.id) {
-                studentId = studentInfo.id;
-                console.log('通过API获取学生ID:', studentId);
-              }
-            } catch (e) {
-              console.error('获取学生信息失败:', e);
+        // 直接通过API获取学生ID
+        if (userInfo && userInfo.username) {
+          try {
+            // 通过用户名获取学生信息
+            const studentInfo = await student.getStudentByUsername(userInfo.username);
+            if (studentInfo && studentInfo.studentId) {
+              studentId = studentInfo.studentId;
+              console.log('通过API获取学生ID:', studentId);
+            } else {
+              throw new Error('API返回的学生信息不完整');
             }
+          } catch (e) {
+            console.error('获取学生信息失败:', e);
+            throw new Error('无法通过API获取学生ID');
           }
+        } else {
+          throw new Error('无法获取用户名');
         }
         
         if (!studentId) {

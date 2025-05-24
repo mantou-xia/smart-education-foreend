@@ -35,7 +35,7 @@
 
 <script>
 import { ref, onMounted } from 'vue';
-import { getUserInfo, getStudentInfo } from '@/utils/auth';
+import { getUserInfo, getToken } from '@/utils/auth';
 import { course, learningProgress, student } from '@/api/api';
 
 export default {
@@ -60,43 +60,37 @@ export default {
         // 获取学生ID
         let studentId;
         
-        // 优先从单独的学生信息中获取
-        const studentInfo = getStudentInfo();
-        if (studentInfo && studentInfo.id) {
-          studentId = studentInfo.id;
-          console.log('从学生信息缓存获取学生ID:', studentId);
-        }
-        // 尝试从用户信息中获取
-        else if (userInfo) {
-          // 从userInfo中获取studentId(登录时已保存)
-          if (userInfo.studentId) {
-            studentId = userInfo.studentId;
-            console.log('从用户缓存获取学生ID:', studentId);
-          } 
-          // 如果没有，则尝试通过API获取
-          else if (userInfo.username) {
-            try {
-              // 通过用户名获取学生信息
-              const apiStudentInfo = await student.getStudentByUsername(userInfo.username);
-              if (apiStudentInfo && apiStudentInfo.id) {
-                studentId = apiStudentInfo.id;
-                console.log('通过API获取学生ID:', studentId);
-              }
-            } catch (e) {
-              console.error('获取学生信息失败:', e);
+        // 直接通过API获取学生ID
+        if (userInfo && userInfo.username) {
+          try {
+            // 通过用户名获取学生信息
+            const apiStudentInfo = await student.getStudentByUsername(userInfo.username);
+            if (apiStudentInfo && apiStudentInfo.studentId) {
+              studentId = apiStudentInfo.studentId;
+              console.log('通过API获取学生ID:', studentId);
+            } else {
+              throw new Error('API返回的学生信息不完整');
             }
+          } catch (e) {
+            console.error('获取学生信息失败:', e);
+            throw new Error('无法通过API获取学生ID');
           }
+        } else {
+          throw new Error('无法获取用户名');
         }
         
         if (!studentId) {
           throw new Error('无法获取学生ID');
         }
         
-        // 获取所有课程
-        const allCourses = await course.getAllCourses();
+        // 获取当前token
+        const token = getToken();
         
-        // 获取学生的课程进度
-        const progressData = await learningProgress.getStudentProgress(studentId);
+        // 获取所有课程，传递token
+        const allCourses = await course.getAllCourses(token);
+        
+        // 获取学生的课程进度，传递token
+        const progressData = await learningProgress.getStudentProgress(studentId, token);
         
         // 合并课程信息和进度信息
         const coursesWithProgress = allCourses.map(courseItem => {
@@ -112,7 +106,22 @@ export default {
         courses.value = coursesWithProgress;
       } catch (e) {
         console.error('获取课程数据失败:', e);
-        error.value = '获取课程数据失败，请稍后重试';
+        
+        // 提供更详细的错误信息
+        let errorMessage = '获取课程数据失败，请稍后重试';
+        
+        if (e.response) {
+          // 服务器返回错误
+          errorMessage = `服务器错误: ${e.response.data?.message || e.response.statusText}`;
+        } else if (e.request) {
+          // 请求已发出，但没有收到响应
+          errorMessage = '网络错误：未能连接到服务器';
+        } else {
+          // 在设置请求时发生了错误
+          errorMessage = `请求错误: ${e.message}`;
+        }
+        
+        error.value = errorMessage;
       } finally {
         loading.value = false;
       }

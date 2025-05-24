@@ -93,70 +93,26 @@ export default {
         // 获取学生ID
         let studentId;
         
-        // 优先从localStorage中的student_info获取
-        const studentInfo = localStorage.getItem('student_info');
-        if (studentInfo) {
+        // 直接通过API获取学生ID
+        if (userInfo && userInfo.username) {
           try {
-            const parsedInfo = JSON.parse(studentInfo);
-            if (parsedInfo && parsedInfo.id) {
-              studentId = parsedInfo.id;
-              console.log('从student_info获取学生ID:', studentId);
+            // 使用改进的API，传递token
+            const apiStudentInfo = await student.getStudentByUsername(userInfo.username, token);
+            if (apiStudentInfo && apiStudentInfo.studentId) {
+              studentId = apiStudentInfo.studentId;
+              console.log('通过API获取学生ID:', studentId);
+              
+              // 可选：将获取到的信息保存到localStorage
+              localStorage.setItem('student_info', JSON.stringify(apiStudentInfo));
+            } else {
+              throw new Error('API返回的学生信息不完整');
             }
           } catch (e) {
-            console.error('解析student_info失败:', e);
+            console.error('获取学生信息失败:', e);
+            throw new Error('无法通过API获取学生ID');
           }
-        }
-        
-        // 如果没有从student_info获取到，尝试从userData中获取
-        if (!studentId) {
-          const userData = localStorage.getItem('userData');
-          if (userData) {
-            try {
-              const parsedUserData = JSON.parse(userData);
-              if (parsedUserData && parsedUserData.studentId) {
-                studentId = parsedUserData.studentId;
-                console.log('从userData获取学生ID:', studentId);
-              }
-            } catch (e) {
-              console.error('解析userData失败:', e);
-            }
-          }
-        }
-        
-        // 如果还没有获取到，尝试从userInfo中获取
-        if (!studentId && userInfo) {
-          if (userInfo.studentId) {
-            studentId = userInfo.studentId;
-            console.log('从userInfo获取学生ID:', studentId);
-          } 
-          // 最后尝试通过API获取
-          else if (userInfo.username) {
-            try {
-              // 使用改进的API，传递token
-              const apiStudentInfo = await student.getStudentByUsername(userInfo.username, token);
-              if (apiStudentInfo && apiStudentInfo.id) {
-                studentId = apiStudentInfo.id;
-                console.log('通过API获取学生ID:', studentId);
-                
-                // 将获取到的信息保存到localStorage
-                localStorage.setItem('student_info', JSON.stringify(apiStudentInfo));
-                
-                // 更新userData
-                const userData = localStorage.getItem('userData');
-                if (userData) {
-                  try {
-                    const parsedUserData = JSON.parse(userData);
-                    parsedUserData.studentId = apiStudentInfo.id;
-                    localStorage.setItem('userData', JSON.stringify(parsedUserData));
-                  } catch (e) {
-                    console.warn('更新userData时出错:', e);
-                  }
-                }
-              }
-            } catch (e) {
-              console.error('获取学生信息失败:', e);
-            }
-          }
+        } else {
+          throw new Error('无法获取用户名');
         }
         
         if (!studentId) {
