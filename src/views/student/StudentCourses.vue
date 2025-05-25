@@ -62,17 +62,17 @@ export default {
         
         // 直接通过API获取学生ID
         if (userInfo && userInfo.username) {
-          try {
-            // 通过用户名获取学生信息
-            const apiStudentInfo = await student.getStudentByUsername(userInfo.username);
+            try {
+              // 通过用户名获取学生信息
+              const apiStudentInfo = await student.getStudentByUsername(userInfo.username);
             if (apiStudentInfo && apiStudentInfo.studentId) {
               studentId = apiStudentInfo.studentId;
-              console.log('通过API获取学生ID:', studentId);
+                console.log('通过API获取学生ID:', studentId);
             } else {
               throw new Error('API返回的学生信息不完整');
-            }
-          } catch (e) {
-            console.error('获取学生信息失败:', e);
+              }
+            } catch (e) {
+              console.error('获取学生信息失败:', e);
             throw new Error('无法通过API获取学生ID');
           }
         } else {

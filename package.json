@@ -6,7 +6,8 @@
     "serve": "vue-cli-service serve",
     "build": "vue-cli-service build",
     "lint": "vue-cli-service lint",
-    "generate:api": "openapi-generator-cli generate -i swagger.json -g javascript-axios -o ./src/api --additional-properties=supportsES6=true,usePromises=true"
+    "generate-student-api": "openapi-generator-cli generate -i swagger_student.json -g javascript-axios -o ./src/api --additional-properties=supportsES6=true,usePromises=true",
+    "generate-teacher-api": "openapi-generator-cli generate -i swagger_teacher.json -g javascript-axios -o ./src/api --additional-properties=supportsES6=true,usePromises=true"
   },
   "dependencies": {
     "axios": "^1.9.0",
