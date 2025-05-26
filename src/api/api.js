@@ -97,14 +97,17 @@ export const authAPI = {
     },
 
     /**
-     * 检查用户名是否可用（学生端，无需token）
-     * @param {string} username - 要检查的用户名
-     * @returns {Promise<boolean>} 用户名可用返回true，不可用返回false
+     * 教师注册（不需要token）
+     * @param {Object} teacherData 教师注册信息
+     * @param {string} teacherData.username 用户名
+     * @param {string} teacherData.password 密码
+     * @param {string} teacherData.email 邮箱
+     * @param {string} teacherData.fullName 姓名
+     * @param {string} teacherData.phone 电话
+     * @returns {Promise<{accessToken: string, refreshToken: string}>} 注册成功返回token
      */
-    async checkAvailableUsername(username) {
-        const response = await studentAxios.get('/api/auth/check-available-username', {
-            params: { username }
-        });
+    async registerTeacher(teacherData) {
+        const response = await teacherAxios.post('/api/teacher/register', teacherData);
         return response.data;
     },
 
@@ -133,6 +136,33 @@ export const authAPI = {
     async changeTeacherPassword(changePasswordData) {
         const axios = createTeacherAuthorizedAxios();
         const response = await axios.put('/api/auth/change-password', changePasswordData);
+        return response.data;
+    },
+
+    /**
+       * 检查学生端用户名是否可用（无需token）
+       * @param {string} username - 要检查的用户名
+       * @returns {Promise<boolean>} 用户名可用返回true，不可用返回false
+       */
+    async checkAvailableUsername(username) {
+        const response = await studentAxios.get('/api/auth/check-available-username', {
+            params: { username }
+        });
+        return response.data;
+    },
+
+    /**
+     * 检查教师端用户名是否可用（不需要token）
+     * @param {string} username 要检查的用户名
+     * @returns {Promise<boolean>} 用户名可用返回true，不可用返回false
+     * 返回值：
+     *   - true: 用户名可用
+     *   - false: 用户名不可用
+     */
+    async checkAvailableUsernameForTeacher(username) {
+        const response = await teacherAxios.get('/api/auth/check-available-username', {
+            params: { username }
+        });
         return response.data;
     }
 };
@@ -195,10 +225,35 @@ export const teacherAPI = {
         const axios = createTeacherAuthorizedAxios();
         const response = await axios.get('/api/teacher/self');
         return response.data;
+    },
+
+    /**
+     * 更新教师信息（需要token）
+     * @param {Object} updateTeacherData 教师信息对象
+     * @param {string} updateTeacherData.username 用户名
+     * @param {string} updateTeacherData.email 邮箱
+     * @param {string} updateTeacherData.fullName 姓名
+     * @param {string} updateTeacherData.phone 电话
+     * @returns {Promise<Object>} 更新后的教师信息
+     */
+    async updateTeacher(updateTeacherData) {
+        const axios = createTeacherAuthorizedAxios();
+        const response = await axios.put('/api/teacher/update', updateTeacherData);
+        return response.data;
+    },
+
+    /**
+     * 根据教师ID获取教师信息（需要token）
+     * @param {number} id 教师ID
+     * @returns {Promise<{teacherId: number, username: string, email?: string, fullName?: string, phone?: string, createdAt?: string, updatedAt?: string}>} 教师信息
+     */
+    async getTeacherById(id) {
+        const axios = createTeacherAuthorizedAxios();
+        const response = await axios.get(`/api/teacher/${id}`);
+        return response.data;
     }
 };
-
-// 其他 API 模块（学生端）保持不变，只需要替换 createAuthorizedAxios() 为 createStudentAuthorizedAxios()
+// 学习进度api模块
 export const learningProgressAPI = {
     /**
      * 获取学生整体学习进度（需要token）
@@ -211,4 +266,159 @@ export const learningProgressAPI = {
         return response.data;
     },
     // ... 其他方法
+};
+
+// 知识点api模块（教师端）
+export const knowledgeAPI = {
+    /**
+     * 更新知识点（需要token）
+     * @param {Object} updateKnowledgeData 知识点信息
+     * @param {number} updateKnowledgeData.knowledgeId 知识点ID
+     * @param {string} updateKnowledgeData.name 知识点名称
+     * @param {string} updateKnowledgeData.description 知识点描述
+     * @param {string} updateKnowledgeData.difficultyLevel 难度等级
+     * @param {string} updateKnowledgeData.teachPlan 教学计划
+     * @returns {Promise<Object>} 更新后的知识点信息
+     * 返回字段：
+     *   - knowledgeId: number 知识点ID
+     *   - name: string 知识点名称
+     *   - description: string 知识点描述
+     *   - difficultyLevel: string 难度等级
+     *   - teacherId: number 教师ID
+     *   - courseId: number 课程ID
+     *   - teachPlan: string 教学计划
+     *   - createdAt: string 创建时间（ISO格式）
+     *   - updatedAt: string 更新时间（ISO格式）
+     */
+    async updateKnowledge(updateKnowledgeData) {
+        const axios = createTeacherAuthorizedAxios();
+        const response = await axios.put('/api/knowledge/update', updateKnowledgeData);
+        return response.data;
+    },
+
+    /**
+     * 新增知识点（需要token）
+     * @param {Object} knowledgeData 知识点信息
+     * @param {string} knowledgeData.name 知识点名称
+     * @param {string} knowledgeData.description 知识点描述
+     * @param {string} knowledgeData.difficultyLevel 难度等级
+     * @param {number} knowledgeData.teacherId 教师ID
+     * @param {number} knowledgeData.courseId 课程ID
+     * @param {string} knowledgeData.teachPlan 教学计划
+     * @returns {Promise<Object>} 新增后的知识点信息
+     * 返回字段：
+     *   - knowledgeId: number 知识点ID
+     *   - name: string 知识点名称
+     *   - description: string 知识点描述
+     *   - difficultyLevel: string 难度等级
+     *   - teacherId: number 教师ID
+     *   - courseId: number 课程ID
+     *   - teachPlan: string 教学计划
+     *   - createdAt: string 创建时间（ISO格式）
+     *   - updatedAt: string 更新时间（ISO格式）
+     */
+    async saveKnowledge(knowledgeData) {
+        const axios = createTeacherAuthorizedAxios();
+        const response = await axios.post('/api/knowledge/save', knowledgeData);
+        return response.data;
+    },
+
+    /**
+     * 根据知识点ID获取知识点信息（需要token）
+     * @param {number} id 知识点ID
+     * @returns {Promise<Object>} 知识点信息
+     * 返回字段：
+     *   - knowledgeId: number 知识点ID
+     *   - name: string 知识点名称
+     *   - description: string 知识点描述
+     *   - difficultyLevel: string 难度等级
+     *   - teacherId: number 教师ID
+     *   - courseId: number 课程ID
+     *   - teachPlan: string 教学计划
+     *   - createdAt: string 创建时间（ISO格式）
+     *   - updatedAt: string 更新时间（ISO格式）
+     */
+    async getKnowledgeById(id) {
+        const axios = createTeacherAuthorizedAxios();
+        const response = await axios.get(`/api/knowledge/${id}`);
+        return response.data;
+    },
+
+    /**
+     * 删除知识点（需要token）
+     * @param {number} id 知识点ID
+     * @returns {Promise<Object>} 删除结果
+     * 返回字段：
+     *   - success: boolean 是否删除成功
+     *   - message: string 提示信息
+     */
+    async deleteKnowledgeById(id) {
+        const axios = createTeacherAuthorizedAxios();
+        const response = await axios.delete(`/api/knowledge/${id}`);
+        return response.data;
+    },
+
+    /**
+     * 根据教师ID获取知识点列表（需要token）
+     * @param {number} teacherId 教师ID
+     * @returns {Promise<Array<Object>>} 知识点列表
+     * 每项字段：
+     *   - knowledgeId: number 知识点ID
+     *   - name: string 知识点名称
+     *   - description: string 知识点描述
+     *   - difficultyLevel: string 难度等级
+     *   - teacherId: number 教师ID
+     *   - courseId: number 课程ID
+     *   - teachPlan: string 教学计划
+     *   - createdAt: string 创建时间（ISO格式）
+     *   - updatedAt: string 更新时间（ISO格式）
+     */
+    async getKnowledgeByTeacherId(teacherId) {
+        const axios = createTeacherAuthorizedAxios();
+        const response = await axios.get(`/api/knowledge/teacher/${teacherId}`);
+        return response.data;
+    },
+
+    /**
+     * 根据课程ID获取知识点列表（需要token）
+     * @param {number} courseId 课程ID
+     * @returns {Promise<Array<Object>>} 知识点列表
+     * 每项字段：
+     *   - knowledgeId: number 知识点ID
+     *   - name: string 知识点名称
+     *   - description: string 知识点描述
+     *   - difficultyLevel: string 难度等级
+     *   - teacherId: number 教师ID
+     *   - courseId: number 课程ID
+     *   - teachPlan: string 教学计划
+     *   - createdAt: string 创建时间（ISO格式）
+     *   - updatedAt: string 更新时间（ISO格式）
+     */
+    async getKnowledgeByCourseId(courseId) {
+        const axios = createTeacherAuthorizedAxios();
+        const response = await axios.get(`/api/knowledge/course/${courseId}`);
+        return response.data;
+    },
+
+    /**
+     * 根据课程ID和教师ID获取知识点列表（需要token）
+     * @param {number} courseId 课程ID
+     * @param {number} teacherId 教师ID
+     * @returns {Promise<Array<Object>>} 知识点列表
+     * 每项字段：
+     *   - knowledgeId: number 知识点ID
+     *   - name: string 知识点名称
+     *   - description: string 知识点描述
+     *   - difficultyLevel: string 难度等级
+     *   - teacherId: number 教师ID
+     *   - courseId: number 课程ID
+     *   - teachPlan: string 教学计划
+     *   - createdAt: string 创建时间（ISO格式）
+     *   - updatedAt: string 更新时间（ISO格式）
+     */
+    async getKnowledgeByTeacherInCourse(courseId, teacherId) {
+        const axios = createTeacherAuthorizedAxios();
+        const response = await axios.get(`/api/knowledge/course/${courseId}/teacher/${teacherId}`);
+        return response.data;
+    }
 };
