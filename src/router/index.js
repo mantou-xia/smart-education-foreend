@@ -162,12 +162,6 @@ const routes = [
         path: 'students',
         name: 'StudentManagement',
         component: () => import('../views/teacher/StudentManagement.vue'),
-      },
-      {
-        path: 'global-api-test-center',
-        name: 'TeacherGlobalAPITestCenter',
-        component: () => import('../views/teacher/GlobalAPITestCenter.vue'),
-        meta: { bypassAuth: true }
       }
     ]
   },
