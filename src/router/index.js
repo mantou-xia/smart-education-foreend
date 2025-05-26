@@ -71,6 +71,66 @@ const routes = [
         path: 'learning-path',
         name: 'StudentLearningPath',
         component: () => import('../views/student/StudentLearningPath.vue')
+      },
+      {
+        path: 'api-test-center',
+        name: 'StudentAPITestCenter',
+        component: () => import('../views/student/StudentAPITestCenter.vue'),
+        meta: { bypassAuth: true }
+      },
+      {
+        path: 'api-test/attendance',
+        name: 'StudentAttendanceAPITest',
+        component: () => import('../views/student/APITestComponents/AttendanceAPITest.vue'),
+        meta: { bypassAuth: true }
+      },
+      {
+        path: 'api-test/exam',
+        name: 'StudentExamAPITest',
+        component: () => import('../views/student/APITestComponents/StudentExamAPITest.vue'),
+        meta: { bypassAuth: true }
+      },
+      {
+        path: 'api-test/assistant',
+        name: 'StudentAssistantAPITest',
+        component: () => import('../views/student/APITestComponents/StudentAssistantAPITest.vue'),
+        meta: { bypassAuth: true }
+      },
+      {
+        path: 'api-test/auth',
+        name: 'StudentAuthAPITest',
+        component: () => import('../views/student/APITestComponents/AuthAPITest.vue'),
+        meta: { bypassAuth: true }
+      },
+      {
+        path: 'api-test/student',
+        name: 'StudentStudentAPITest',
+        component: () => import('../views/student/APITestComponents/StudentAPITest.vue'),
+        meta: { bypassAuth: true }
+      },
+      {
+        path: 'api-test/course',
+        name: 'StudentCourseAPITest',
+        component: () => import('../views/student/APITestComponents/CourseAPITest.vue'),
+        meta: { bypassAuth: true }
+      },
+      {
+        path: 'api-test/learning-progress',
+        name: 'StudentLearningProgressAPITest',
+        component: () => import('../views/student/APITestComponents/LearningProgressAPITest.vue'),
+        meta: { bypassAuth: true }
+      },
+      {
+        path: 'api-test/learning-plan',
+        name: 'StudentLearningPlanAPITest',
+        component: () => import('../views/student/APITestComponents/LearningPlanAPITest.vue'),
+        meta: { bypassAuth: true }
+      },
+      {
+        path: 'global-api-test-center',
+        name: 'GlobalAPITestCenter',
+        component: () => import('../views/student/GlobalAPITestCenter.vue'),
+        meta: { bypassAuth: true }
       }
     ]
   },
@@ -145,6 +205,12 @@ router.beforeEach((to, from, next) => {
   
   // 每次路由导航时清理冗余认证信息
   cleanRedundantAuth();
+  
+  // 如果路由元信息中有 bypassAuth，直接放行
+  if (to.meta.bypassAuth) {
+    console.log('API测试页面，直接放行');
+    return next();
+  }
   
   const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true'
   console.log('路由守卫: 登录状态:', isLoggedIn);

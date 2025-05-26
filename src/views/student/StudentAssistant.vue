@@ -132,7 +132,14 @@
 <script>
 import { ref, reactive, onMounted } from 'vue';
 import { getUserInfo } from '@/utils/auth';
-import { learningProgress, teachingAssistant, knowledge, student } from '@/api/api';
+import { 
+  learningProgressAPI, 
+  teachingAssistantAPI, 
+  knowledgeAPI, 
+  studentAPI, 
+  examAPI,
+  courseAPI
+} from '@/api/api';
 
 export default {
   name: 'StudentAssistant',
@@ -140,6 +147,7 @@ export default {
     // 页面状态
     const loading = ref(false);
     const error = ref('');
+    const apiTestResults = ref({});
     
     // 聊天功能
     const chatMessages = ref([
@@ -168,6 +176,92 @@ export default {
     });
     const progressChartLoaded = ref(false);
     
+    // 初始化数据
+    const initializeData = async () => {
+      loading.value = true;
+      error.value = '';
+
+      try {
+        // 获取当前登录的用户信息
+        const userInfo = getUserInfo();
+        if (!userInfo) {
+          throw new Error('无法获取用户信息，请重新登录');
+        }
+
+        // 获取学生ID
+        let studentId;
+        
+        // 直接通过API获取学生ID
+        if (userInfo && userInfo.username) {
+          try {
+            // 通过用户名获取学生信息
+            const apiStudentInfo = await studentAPI.getStudentByUsername(userInfo.username);
+            if (apiStudentInfo && apiStudentInfo.studentId) {
+              studentId = apiStudentInfo.studentId;
+              console.log('通过API获取学生ID:', studentId);
+              apiTestResults.value.studentInfo = apiStudentInfo;
+            } else {
+              throw new Error('API返回的学生信息不完整');
+            }
+          } catch (e) {
+            console.error('获取学生信息失败:', e);
+            throw new Error('无法通过API获取学生ID');
+          }
+        } else {
+          throw new Error('无法获取用户名');
+        }
+        
+        if (!studentId) {
+          throw new Error('无法获取学生ID');
+        }
+
+        // API测试：获取所有课程
+        const courses = await courseAPI.getAllCourses();
+        console.log('[API测试] 获取所有课程成功:', courses);
+        apiTestResults.value.allCourses = courses;
+        
+        // API测试：获取知识点
+        const knowledgePointsResult = await Promise.all(
+          courses.map(course => knowledgeAPI.getKnowledgeByCourseId(course.id))
+        );
+        const allKnowledgePoints = knowledgePointsResult.flat();
+        console.log('[API测试] 获取知识点成功:', allKnowledgePoints);
+        apiTestResults.value.knowledgePoints = allKnowledgePoints;
+        
+        knowledgePoints.value = allKnowledgePoints;
+        
+        // API测试：获取学生学习进度
+        const studentProgress = await learningProgressAPI.getStudentProgress(studentId);
+        console.log('[API测试] 获取学生学习进度成功:', studentProgress);
+        apiTestResults.value.studentProgress = studentProgress;
+        
+        // 计算学习统计数据
+        const progressStatistics = await learningProgressAPI.getProgressStatistics(studentId);
+        console.log('[API测试] 获取学习进度统计成功:', progressStatistics);
+        apiTestResults.value.progressStatistics = progressStatistics;
+        
+        // 更新统计数据
+        stats.overallProgress = progressStatistics.overallProgress || 0;
+        stats.completionRate = progressStatistics.completionRate || 0;
+        stats.consecutiveDays = progressStatistics.consecutiveDays || 0;
+        
+        // API测试：获取推荐学习资源
+        const recommendedResources = await learningProgressAPI.getRecommendedResources(studentId);
+        console.log('[API测试] 获取推荐学习资源成功:', recommendedResources);
+        apiTestResults.value.recommendedResources = recommendedResources;
+        
+        // API测试：获取最近的考试/作业
+        const recentExams = await examAPI.getRecentExams(studentId);
+        console.log('[API测试] 获取最近考试成功:', recentExams);
+        apiTestResults.value.recentExams = recentExams;
+      } catch (e) {
+        console.error('初始化数据失败:', e);
+        error.value = '初始化数据失败，请稍后重试';
+      } finally {
+        loading.value = false;
+      }
+    };
+    
     // 发送问题
     const sendQuestion = async () => {
       if (!userQuestion.value.trim() || isProcessingQuestion.value) return;
@@ -182,8 +276,7 @@ export default {
       
       try {
         // 调用后端API获取智能回复
-        // 这里假设使用教学助手API，真实情况可能需要专门的聊天API
-        const response = await teachingAssistant.generateTeachingPlan({
+        const response = await teachingAssistantAPI.generateTeachingPlan({
           subjectType: 'QA',
           courseOutline: userQuestion.value,
           courseDocuments: [],
@@ -216,12 +309,19 @@ export default {
       isGeneratingExercises.value = true;
       
       try {
-        // 此处调用生成练习的API
-        // 如果后端没有现成API，可以通过提示用户练习生成中
-        console.log('生成练习，参数:', exerciseParams);
+        // 获取当前登录的用户信息
+        const userInfo = getUserInfo();
+        const studentId = await studentAPI.getStudentByUsername(userInfo.username).then(res => res.studentId);
         
-        // 模拟API响应时间
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // 生成个性化练习
+        const generatedExercises = await examAPI.generatePersonalizedExercises({
+          studentId,
+          knowledgePointId: exerciseParams.knowledgePoint,
+          difficulty: exerciseParams.difficulty
+        });
+        
+        console.log('[API测试] 生成个性化练习成功:', generatedExercises);
+        apiTestResults.value.generatedExercises = generatedExercises;
         
         alert('练习已生成，请到作业页面查看');
       } catch (e) {
@@ -242,85 +342,26 @@ export default {
       isCheckingCode.value = true;
       
       try {
-        // 此处调用代码检查API
-        // 如果后端没有现成API，可以给出一个默认提示
-        console.log('检查代码:', codeInput.value);
+        // 调用代码检查API
+        const codeCheckResult = await teachingAssistantAPI.checkCode({
+          code: codeInput.value,
+          language: 'javascript'
+        });
         
-        // 模拟API响应时间
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        console.log('[API测试] 代码检查结果:', codeCheckResult);
+        apiTestResults.value.codeCheckResult = codeCheckResult;
         
-        alert('代码检查完成，没有发现错误！');
+        // 根据检查结果给出反馈
+        if (codeCheckResult.hasErrors) {
+          alert(`代码存在 ${codeCheckResult.errorCount} 个错误：\n${codeCheckResult.errorMessages.join('\n')}`);
+        } else {
+          alert('代码检查通过，没有发现错误！');
+        }
       } catch (e) {
-        console.error('检查代码失败:', e);
-        alert('检查代码失败，请稍后再试');
+        console.error('代码检查失败:', e);
+        alert('代码检查失败，请稍后再试');
       } finally {
         isCheckingCode.value = false;
-      }
-    };
-    
-    // 初始化页面数据
-    const initializeData = async () => {
-      loading.value = true;
-      error.value = '';
-      
-      try {
-        // 获取当前登录的用户信息
-        const userInfo = getUserInfo();
-        if (!userInfo) {
-          throw new Error('无法获取用户信息，请重新登录');
-        }
-        
-        // 获取学生ID
-        let studentId;
-        
-        // 直接通过API获取学生ID
-        if (userInfo && userInfo.username) {
-          try {
-            // 通过用户名获取学生信息
-            const studentInfo = await student.getStudentByUsername(userInfo.username);
-            if (studentInfo && studentInfo.studentId) {
-              studentId = studentInfo.studentId;
-              console.log('通过API获取学生ID:', studentId);
-            } else {
-              throw new Error('API返回的学生信息不完整');
-            }
-          } catch (e) {
-            console.error('获取学生信息失败:', e);
-            throw new Error('无法通过API获取学生ID');
-          }
-        } else {
-          throw new Error('无法获取用户名');
-        }
-        
-        if (!studentId) {
-          throw new Error('无法获取学生ID');
-        }
-        
-        // 获取知识点列表
-        const knowledgeList = await knowledge.getAllKnowledgePoints();
-        knowledgePoints.value = knowledgeList;
-        
-        // 获取学习进度统计
-        const progressData = await learningProgress.getOverallProgress(studentId);
-        const statisticsData = await learningProgress.getProgressStatistics(studentId);
-        
-        // 设置学习统计数据
-        stats.overallProgress = Math.round(progressData.overallPercentage || 0);
-        stats.completionRate = Math.round(statisticsData.completionRate || 0);
-        stats.consecutiveDays = statisticsData.consecutiveDays || 0;
-        
-        // 异步加载进度图表（模拟数据）
-        setTimeout(() => {
-          progressChartLoaded.value = true;
-          // 如果要使用图表库如Chart.js，可以在这里初始化图表
-          // 假设已经有了DOM元素 id="progressChart"
-        }, 500);
-        
-      } catch (e) {
-        console.error('初始化数据失败:', e);
-        error.value = '获取学习助手数据失败，请稍后重试';
-      } finally {
-        loading.value = false;
       }
     };
     
@@ -330,19 +371,20 @@ export default {
     return {
       loading,
       error,
+      apiTestResults,
       chatMessages,
       userQuestion,
       isProcessingQuestion,
-      sendQuestion,
       knowledgePoints,
       exerciseParams,
       isGeneratingExercises,
-      generateExercises,
       codeInput,
       isCheckingCode,
-      checkCode,
       stats,
-      progressChartLoaded
+      progressChartLoaded,
+      sendQuestion,
+      generateExercises,
+      checkCode
     };
   }
 }

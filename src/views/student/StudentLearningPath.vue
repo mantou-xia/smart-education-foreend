@@ -126,8 +126,7 @@
 <script>
 import { ref, onMounted } from 'vue';
 import { getUserInfo } from '@/utils/auth';
-import { knowledge, learningProgress, course } from '@/api/api';
-import { student } from '@/api/api';
+import { knowledgeAPI, learningProgressAPI, courseAPI, studentAPI, learningPlanAPI } from '@/api/api';
 
 export default {
   name: 'StudentLearningPath',
@@ -135,6 +134,7 @@ export default {
     // 页面状态
     const loading = ref(false);
     const error = ref('');
+    const apiTestResults = ref({});
 
     // 知识图谱数据
     const knowledgePoints = ref([]);
@@ -208,10 +208,11 @@ export default {
         if (userInfo && userInfo.username) {
           try {
             // 通过用户名获取学生信息
-            const apiStudentInfo = await student.getStudentByUsername(userInfo.username);
+            const apiStudentInfo = await studentAPI.getStudentByUsername(userInfo.username);
             if (apiStudentInfo && apiStudentInfo.studentId) {
               studentId = apiStudentInfo.studentId;
               console.log('通过API获取学生ID:', studentId);
+              apiTestResults.value.studentInfo = apiStudentInfo;
             } else {
               throw new Error('API返回的学生信息不完整');
             }
@@ -227,13 +228,35 @@ export default {
           throw new Error('无法获取学生ID');
         }
 
-        // 获取所有课程
-        const courses = await course.getAllCourses();
+        // API测试：获取所有课程
+        const courses = await courseAPI.getAllCourses();
+        console.log('[API测试] 获取所有课程成功:', courses);
+        apiTestResults.value.allCourses = courses;
+        
+        // API测试：获取推荐学习资源
+        const recommendedResources = await learningProgressAPI.getRecommendedResources(studentId);
+        console.log('[API测试] 获取推荐学习资源成功:', recommendedResources);
+        apiTestResults.value.recommendedResources = recommendedResources;
+        
+        // API测试：获取学生整体学习进度
+        const studentProgress = await learningProgressAPI.getStudentProgress(studentId);
+        console.log('[API测试] 获取学生整体学习进度成功:', studentProgress);
+        apiTestResults.value.studentProgress = studentProgress;
+        
+        // API测试：获取学习进度统计
+        const progressStatistics = await learningProgressAPI.getProgressStatistics(studentId);
+        console.log('[API测试] 获取学习进度统计成功:', progressStatistics);
+        apiTestResults.value.progressStatistics = progressStatistics;
+        
+        // API测试：获取当前学习计划
+        const currentLearningPlan = await learningPlanAPI.getCurrentLearningPlan(studentId);
+        console.log('[API测试] 获取当前学习计划成功:', currentLearningPlan);
+        apiTestResults.value.currentLearningPlan = currentLearningPlan;
         
         // 获取知识点数据（假设知识点是按课程组织的）
         const knowledgePromises = courses.map(async (courseItem) => {
           try {
-            const points = await knowledge.getKnowledgeByCourseId(courseItem.id);
+            const points = await knowledgeAPI.getKnowledgeByCourseId(courseItem.id);
             return points;
           } catch (e) {
             console.error(`获取课程${courseItem.name}知识点失败:`, e);
@@ -245,72 +268,45 @@ export default {
         const allPoints = (await Promise.all(knowledgePromises)).flat();
         
         // 获取学生知识点掌握程度
-        const progressData = await learningProgress.getStudentProgress(studentId);
+        const progressData = await learningProgressAPI.getStudentProgress(studentId);
         
         // 为知识点添加掌握程度
-        const pointsWithMastery = allPoints.map(point => {
-          const progress = progressData.find(p => p.knowledgePointId === point.id);
+        const knowledgePointsWithProgress = allPoints.map(point => {
+          const progress = progressData.find(p => p.knowledgeId === point.id);
           return {
             ...point,
-            masteryLevel: progress ? Math.round(progress.masteryLevel * 100) : 0
+            masteryLevel: progress ? progress.masteryLevel : 0
           };
         });
         
-        // 设置知识点和薄弱点
-        knowledgePoints.value = pointsWithMastery;
+        knowledgePoints.value = knowledgePointsWithProgress;
         
-        // 识别薄弱点（掌握度低于70%的点）
-        weaknessPoints.value = pointsWithMastery
-          .filter(point => point.masteryLevel < 70)
-          .sort((a, b) => a.masteryLevel - b.masteryLevel) // 按掌握度从低到高排序
-          .slice(0, 5); // 取前5个最薄弱的点
-          
-        // 生成推荐学习资源（基于薄弱点）
-        const recommendedResources = weaknessPoints.value.map(point => {
-          // 这里应该调用推荐API，但假设没有这个API，我们模拟生成数据
-          const types = ['视频课程', '练习题库', '文章', '课件'];
-          const difficulties = ['初级', '中级', '高级'];
-          
-          const type = types[Math.floor(Math.random() * types.length)];
-          const duration = type === '视频课程' ? `${Math.floor(Math.random() * 3) + 1}小时` :
-                          type === '文章' ? `${Math.floor(Math.random() * 30) + 5}分钟` :
-                          type === '练习题库' ? `${Math.floor(Math.random() * 20) + 5}题` : '未知';
-                          
-          return {
-            id: `rec-${point.id}`,
-            type,
-            title: `${point.name}学习资源`,
-            duration,
-            difficulty: difficulties[Math.floor(Math.random() * difficulties.length)]
-          };
-        });
+        // 识别薄弱点
+        weaknessPoints.value = knowledgePointsWithProgress
+          .filter(point => point.masteryLevel < 40)
+          .sort((a, b) => a.masteryLevel - b.masteryLevel);
         
-        recommendations.value = recommendedResources;
+        // 生成学习计划
+        const generatedPlan = await learningPlanAPI.generateLearningPlan(
+          studentId, 
+          '提高薄弱知识点', 
+          7, 
+          courses.map(c => c.id)
+        );
         
-        // 生成学习计划（基于薄弱点）
-        const dayNames = ['周一', '周二', '周三', '周四', '周五'];
-        const learningPlanItems = weaknessPoints.value.slice(0, 5).map((point, index) => {
-          return {
-            day: dayNames[index] || `第${index + 1}天`,
-            task: `${point.name}学习`,
-            duration: '2小时'
-          };
-        });
+        learningPlan.value = generatedPlan.dailyActivities || [];
         
-        if (learningPlanItems.length > 0) {
-          // 添加一个综合练习
-          learningPlanItems.push({
-            day: '周末',
-            task: '综合练习与复习',
-            duration: '3小时'
-          });
-        }
-        
-        learningPlan.value = learningPlanItems;
-        
+        // 推荐资源
+        recommendations.value = recommendedResources.slice(0, 5).map(resource => ({
+          id: resource.id,
+          type: resource.type || '学习资源',
+          title: resource.title || '未命名资源',
+          duration: resource.duration ? `${resource.duration}分钟` : '未知时长',
+          difficulty: resource.difficulty || '未知难度'
+        }));
       } catch (e) {
-        console.error('获取学习路径数据失败:', e);
-        error.value = '获取学习路径数据失败，请稍后重试';
+        console.error('初始化数据失败:', e);
+        error.value = '初始化数据失败，请稍后重试';
       } finally {
         loading.value = false;
       }
@@ -322,7 +318,9 @@ export default {
     return {
       loading,
       error,
+      apiTestResults,
       knowledgePoints,
+      zoomLevel,
       weaknessPoints,
       lastUpdateDate,
       learningPlan,

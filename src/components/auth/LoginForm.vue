@@ -73,9 +73,15 @@
 
 <script>
 import { ref, reactive } from 'vue';
-import { auth } from '@/api/api';
-import { setToken, getToken, setRefreshToken, setUserInfo, setStudentInfo, cleanRedundantAuth } from '@/utils/auth';
-import { student } from '@/api/api';
+import { authAPI } from '@/api/api';  // 使用 authAPI
+import { 
+  setToken, 
+  setRefreshToken, 
+  setUserInfo, 
+  setStudentInfo, 
+  cleanRedundantAuth 
+} from '@/utils/auth';
+import { studentAPI } from '@/api/api';
 
 // 根据用户角色获取默认首页路径
 function getHomePageByRole(role) {
@@ -93,10 +99,6 @@ function getHomePageByRole(role) {
 function formatRoleName(role) {
   const roleStr = String(role || '').toUpperCase();
   
-  // 打印原始角色信息，便于调试
-  console.log('正在格式化角色:', roleStr);
-  
-  // 处理常见的角色名格式 (ROLE_XXX 或 XXX)
   if (roleStr.includes('ROLE_TEACHER') || roleStr.includes('TEACHER')) {
     return 'teacher';
   } else if (roleStr.includes('ROLE_STUDENT') || roleStr.includes('STUDENT')) {
@@ -104,13 +106,8 @@ function formatRoleName(role) {
   } else if (roleStr.includes('ROLE_ADMIN') || roleStr.includes('ADMIN')) {
     return 'admin';
   } else {
-    // 如果是以ROLE_开头的其他角色，提取ROLE_后面的部分并转换为小写
     const roleMatch = roleStr.match(/ROLE_(.+)/);
-    if (roleMatch && roleMatch[1]) {
-      return roleMatch[1].toLowerCase();
-    }
-    // 否则返回原角色小写
-    return (role || '').toLowerCase();
+    return roleMatch ? roleMatch[1].toLowerCase() : (role || '').toLowerCase();
   }
 }
 
@@ -132,7 +129,7 @@ export default {
     const showPassword = ref(false);
     const isSubmitting = ref(false);
     const loginError = ref('');
-    const userType = ref('student'); // 默认为学生登录
+    const userType = ref('student');
     
     const validateUsername = () => {
       if (!form.username) {
@@ -167,35 +164,31 @@ export default {
         isSubmitting.value = true;
         
         try {
-          // 调用后端登录API
-          const response = await auth.login({
-            username: form.username,
-            password: form.password
-          });
+          // 根据用户类型选择登录 API
+          let loginResponse;
+          if (userType.value === 'student') {
+            loginResponse = await authAPI.studentLogin(form.username, form.password);
+          } else if (userType.value === 'teacher') {
+            loginResponse = await authAPI.teacherLogin(form.username, form.password);
+          } else {
+            throw new Error('无效的用户角色');
+          }
           
-          // 获取返回的token和角色信息
-          const { tokens, roles } = response;
+          // 检查并处理登录响应
+          const { tokens, roles } = loginResponse;
           
-          // 检查并标准化token格式
           if (!tokens || !tokens.accessToken) {
             throw new Error('服务器未返回有效的token');
           }
           
-          // 清理冗余的认证信息
+          // 清理冗余认证信息
           cleanRedundantAuth();
           
-          // 保存token到本地存储
-          console.log('登录成功，准备保存token...');
+          // 保存 token
           setToken(tokens.accessToken);
-          
           if (tokens.refreshToken) {
             setRefreshToken(tokens.refreshToken);
-            console.log('已保存refreshToken');
           }
-          
-          // 测试token已成功保存
-          const savedToken = getToken();
-          console.log('验证token保存状态:', savedToken ? '成功' : '失败');
           
           // 创建基本用户信息
           const userInfo = {
@@ -205,74 +198,48 @@ export default {
           };
           
           // 如果是学生用户，获取更多学生详细信息
-          if (userType.value === 'student' || (roles && roles.some(role => String(role).toUpperCase().includes('STUDENT')))) {
+          if (userType.value === 'student') {
             try {
-              // 确保token设置生效后再进行API调用
-              console.log('尝试获取学生详情信息...');
-              
-              // 使用刚刚获取的token，直接调用API
-              const accessToken = tokens.accessToken;
-              console.log(`直接使用登录返回的token调用API: ${accessToken.substring(0, 15)}...`);
-              
-              // 使用token获取学生详细信息
-              const studentInfo = await student.getStudentByUsername(form.username, accessToken);
-              if (studentInfo && studentInfo.id) {
-                // 将学生ID等详细信息添加到用户信息中
-                userInfo.studentId = studentInfo.id;
+              const studentInfo = await studentAPI.getStudentByUsername(form.username);
+              if (studentInfo && studentInfo.studentId) {
+                userInfo.studentId = studentInfo.studentId;
                 userInfo.studentInfo = studentInfo;
-                console.log('已获取并保存学生详细信息:', studentInfo);
-                
-                // 单独保存学生信息到localStorage
                 setStudentInfo(studentInfo);
-              } else {
-                console.warn('获取到的学生信息不完整');
               }
             } catch (e) {
               console.error('获取学生详细信息失败:', e);
-              // 获取失败不阻止登录流程，但记录错误
               userInfo.studentInfoError = true;
             }
           }
           
           // 保存用户信息
           setUserInfo(userInfo);
-          
-          // 设置登录状态
           localStorage.setItem('isLoggedIn', 'true');
           
-          // 根据角色获取首页路径
-          let roleName = '';
-          if (roles && roles.length > 0) {
-            roleName = roles[0];
-          }
+          // 格式化角色名称
+          const formattedRole = formatRoleName(roles[0] || userType.value);
           
-          // 格式化角色名称为路由所需格式
-          const formattedRole = formatRoleName(roleName);
-          
-          // 保存用户数据到userData（路由守卫使用）
+          // 准备存储的用户数据
           const userDataToStore = {
             username: form.username,
-            name: form.username, // 初始时用username作为name
+            name: form.username,
             role: formattedRole
           };
           
           // 如果有学生信息，添加学生相关数据
           if (userInfo.studentInfo) {
-            userDataToStore.studentId = userInfo.studentInfo.id;
-            // 如果学生信息中包含姓名，则使用学生姓名
+            userDataToStore.studentId = userInfo.studentInfo.studentId;
             if (userInfo.studentInfo.fullName) {
               userDataToStore.name = userInfo.studentInfo.fullName;
             }
           }
           
-          console.log('保存userData到localStorage:', userDataToStore);
           localStorage.setItem('userData', JSON.stringify(userDataToStore));
           
-          const homePage = getHomePageByRole(roleName);
+          // 获取首页路径
+          const homePage = getHomePageByRole(roles[0] || userType.value);
           
-          console.log('登录成功，原始角色:', roleName, '格式化角色:', formattedRole, '跳转路径:', homePage);
-          
-          // 通知父组件登录成功，并传递用户信息和主页路径
+          // 通知父组件登录成功
           emit('login', { 
             user: userInfo, 
             homePage 

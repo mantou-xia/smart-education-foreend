@@ -59,8 +59,7 @@
 
 <script>
 import { ref, reactive, onMounted } from 'vue';
-import { getUserInfo, getToken } from '@/utils/auth';
-import { course, learningProgress, student } from '@/api/api';
+import { courseAPI, learningProgressAPI, studentAPI } from '@/api/api';
 
 export default {
   name: 'StudentProgress',
@@ -81,64 +80,37 @@ export default {
       error.value = '';
       
       try {
-        // 获取当前登录的用户信息
-        const userInfo = getUserInfo();
-        if (!userInfo) {
-          throw new Error('无法获取用户信息，请重新登录');
+        // 直接使用 getSelfStudentInfo() 获取当前登录学生信息
+        const selfStudentInfo = await studentAPI.getSelfStudentInfo();
+        
+        if (!selfStudentInfo || !selfStudentInfo.studentId) {
+          throw new Error('无法获取学生信息');
         }
         
-        // 获取当前token
-        const token = getToken();
+        const studentId = selfStudentInfo.studentId;
+        console.log('获取当前学生ID:', studentId);
         
-        // 获取学生ID
-        let studentId;
-        
-        // 直接通过API获取学生ID
-        if (userInfo && userInfo.username) {
-          try {
-            // 使用改进的API，传递token
-            const apiStudentInfo = await student.getStudentByUsername(userInfo.username, token);
-            if (apiStudentInfo && apiStudentInfo.studentId) {
-              studentId = apiStudentInfo.studentId;
-              console.log('通过API获取学生ID:', studentId);
-              
-              // 可选：将获取到的信息保存到localStorage
-              localStorage.setItem('student_info', JSON.stringify(apiStudentInfo));
-            } else {
-              throw new Error('API返回的学生信息不完整');
-            }
-          } catch (e) {
-            console.error('获取学生信息失败:', e);
-            throw new Error('无法通过API获取学生ID');
-          }
-        } else {
-          throw new Error('无法获取用户名');
-        }
-        
-        if (!studentId) {
-          throw new Error('无法获取学生ID');
-        }
-        
-        // 获取学生的整体学习进度，传递token
-        const overallData = await learningProgress.getOverallProgress(studentId, token);
+        // 获取学生的整体学习进度
+        const overallData = await learningProgressAPI.getOverallProgress(studentId);
         overallProgress.value = Math.round(overallData.overallPercentage || 0);
         
-        // 获取学习统计数据，传递token
-        const statisticsData = await learningProgress.getProgressStatistics(studentId, token);
+        // 获取学习统计数据
+        const statisticsData = await learningProgressAPI.getProgressStatistics(studentId);
         stats.completedCourses = statisticsData.completedCourses || 0;
         stats.completedAssignments = statisticsData.completedAssignments || 0;
         stats.studyHours = statisticsData.totalStudyHours || 0;
         
-        // 获取所有课程，传递token
-        const allCourses = await course.getAllCourses(token);
+        // 获取所有课程
+        const allCourses = await courseAPI.getAllCourses();
         
-        // 获取课程进度详情，传递token
+        // 获取课程进度详情
         const courseProgressPromises = allCourses.map(async courseItem => {
           try {
-            const progressData = await learningProgress.getCourseProgress(studentId, courseItem.id, token);
+            const progressData = await learningProgressAPI.getCourseProgress(studentId, courseItem.id);
             return {
               id: courseItem.id,
               name: courseItem.name,
+              description: courseItem.description || '暂无描述',
               progress: Math.round(progressData.progressPercentage || 0)
             };
           } catch (e) {
@@ -146,6 +118,7 @@ export default {
             return {
               id: courseItem.id,
               name: courseItem.name,
+              description: courseItem.description || '暂无描述',
               progress: 0
             };
           }
@@ -155,7 +128,7 @@ export default {
         
       } catch (e) {
         console.error('获取学习进度数据失败:', e);
-        error.value = '获取学习进度数据失败，请稍后重试';
+        error.value = e.message || '获取学习进度数据失败，请稍后重试';
       } finally {
         loading.value = false;
       }

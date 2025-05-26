@@ -10,8 +10,10 @@
     "generate-teacher-api": "openapi-generator-cli generate -i swagger_teacher.json -g javascript-axios -o ./src/api --additional-properties=supportsES6=true,usePromises=true"
   },
   "dependencies": {
+    "@element-plus/icons-vue": "^2.3.1",
     "axios": "^1.9.0",
     "core-js": "^3.8.3",
+    "element-plus": "^2.9.11",
     "vue": "^3.2.13",
     "vue-router": "^4.5.0"
   },

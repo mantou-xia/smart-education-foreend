@@ -46,7 +46,12 @@ export default {
       ],
       studentMenuItems: [
         { name: '在线学习助手', path: '/student/assistant' },
-        { name: '个性化学习路径', path: '/student/learning-path' }
+        { name: '个性化学习路径', path: '/student/learning-path' },
+        { 
+          name: 'API 测试中心', 
+          path: '/student/global-api-test-center',
+          divider: true 
+        }
       ],
       adminMenuItems: [
         { name: '系统面板', path: '/admin/dashboard' },

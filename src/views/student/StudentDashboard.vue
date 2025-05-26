@@ -1,5 +1,5 @@
 <template>
-  <div class="student-dashboard">    
+  <div class="student-dashboard">
     <div class="dashboard-content">
       <router-view></router-view>
     </div>
@@ -7,27 +7,28 @@
 </template>
 
 <script>
-import { clearAuth, setStudentInfo } from '@/utils/auth'
-import { student } from '@/api/api'
+import { clearAuth } from '@/utils/auth'
+import { studentAPI, courseAPI, learningProgressAPI } from '@/api/api'
 
 export default {
   name: 'StudentDashboard',
   data() {
     return {
-      userData: null
+      userData: null,
+      apiTestResults: {}
     }
   },
   created() {
     // 获取用户数据
     try {
       this.userData = JSON.parse(localStorage.getItem('userData'))
-      
+
       // 如果不是学生，重定向到登录页
       if (this.userData?.role !== 'student') {
         this.$router.push({ name: 'Login' })
         return
       }
-      
+
       // 确保获取到学生ID
       this.ensureStudentInfo()
     } catch (e) {
@@ -39,40 +40,35 @@ export default {
     // 确保获取到学生信息
     async ensureStudentInfo() {
       try {
-        // 检查本地存储中是否已有学生信息
-        const studentInfo = JSON.parse(localStorage.getItem('student_info'))
-        if (studentInfo && studentInfo.id) {
-          console.log('已找到缓存的学生信息:', studentInfo.id)
-          return
-        }
-        
-        // 如果没有，则通过API获取
-        if (this.userData && this.userData.username) {
-          console.log('正在通过API获取学生信息...')
-          const apiStudentInfo = await student.getStudentByUsername(this.userData.username)
-          
-          if (apiStudentInfo && apiStudentInfo.id) {
-            console.log('成功获取学生信息:', apiStudentInfo.id)
-            // 保存到本地存储
-            setStudentInfo(apiStudentInfo)
-            
-            // 更新userData
-            this.userData.studentId = apiStudentInfo.id
-            localStorage.setItem('userData', JSON.stringify(this.userData))
-          } else {
-            console.warn('API返回的学生信息不完整')
-          }
-        }
-      } catch (e) {
-        console.error('获取学生信息失败:', e)
+        // 1. 获取当前登录学生的自身信息
+        const selfInfo = await studentAPI.getSelfStudentInfo()
+        console.log('[API测试] 获取当前学生信息成功:', selfInfo)
+        this.apiTestResults.selfStudentInfo = selfInfo
+
+        // 3. 获取所有课程
+        const allCourses = await courseAPI.getAllCourses()
+        console.log('[API测试] 获取所有课程成功:', allCourses)
+        this.apiTestResults.allCourses = allCourses
+
+        // 4. 获取学生整体学习进度
+        const studentProgress = await learningProgressAPI.getStudentProgress(selfInfo.studentId)
+        console.log('[API测试] 获取学生整体学习进度成功:', studentProgress)
+        this.apiTestResults.studentProgress = studentProgress
+
+        // 5. 获取学习进度统计
+        const progressStatistics = await learningProgressAPI.getProgressStatistics(selfInfo.studentId)
+        console.log('[API测试] 获取学习进度统计成功:', progressStatistics)
+        this.apiTestResults.progressStatistics = progressStatistics
+      } catch (error) {
+        console.error('[API测试] 学生相关API测试失败:', error)
       }
     },
-    
+
     handleLogout() {
       // 使用clearAuth函数清除所有认证信息
       clearAuth()
       console.log('已清除所有认证信息，准备跳转到登录页')
-      
+
       // 重定向到登录页
       this.$router.push({ name: 'Login' })
     }
@@ -94,4 +90,4 @@ export default {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   min-height: calc(100vh - 200px);
 }
-</style> 
+</style>

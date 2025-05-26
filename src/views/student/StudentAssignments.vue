@@ -36,7 +36,7 @@
 <script>
 import { ref, onMounted } from 'vue';
 import { getUserInfo } from '@/utils/auth';
-import { studentExam, exam, course, student } from '@/api/api';
+import { studentExamAPI, examAPI, courseAPI, studentAPI } from '@/api/api';
 
 export default {
   name: 'StudentAssignments',
@@ -44,6 +44,7 @@ export default {
     const assignments = ref([]);
     const loading = ref(false);
     const error = ref('');
+    const apiTestResults = ref({});
     
     // 获取学生作业数据
     const fetchAssignments = async () => {
@@ -64,10 +65,11 @@ export default {
         if (userInfo && userInfo.username) {
           try {
             // 通过用户名获取学生信息
-            const studentInfo = await student.getStudentByUsername(userInfo.username);
+            const studentInfo = await studentAPI.getStudentByUsername(userInfo.username);
             if (studentInfo && studentInfo.studentId) {
               studentId = studentInfo.studentId;
               console.log('通过API获取学生ID:', studentId);
+              apiTestResults.value.studentInfo = studentInfo;
             } else {
               throw new Error('API返回的学生信息不完整');
             }
@@ -83,9 +85,15 @@ export default {
           throw new Error('无法获取学生ID');
         }
         
-        // 获取学生的考试成绩列表（包括作业）
-        // 这里我们假设后端API把作业也当作一种考试类型
-        const examScores = await studentExam.getStudentExamScores(studentId);
+        // API测试：获取学生考试成绩
+        const examScores = await studentExamAPI.getStudentExamScores(studentId);
+        console.log('[API测试] 获取学生考试成绩成功:', examScores);
+        apiTestResults.value.examScores = examScores;
+        
+        // API测试：搜索考试
+        const searchedExams = await studentExamAPI.searchExamsAndQuestions(studentId, '');
+        console.log('[API测试] 搜索考试成功:', searchedExams);
+        apiTestResults.value.searchedExams = searchedExams;
         
         // 获取详细的考试/作业信息
         const assignmentPromises = examScores
@@ -93,13 +101,13 @@ export default {
           .map(async item => {
             try {
               // 获取作业详情
-              const examDetail = await exam.getExamById(item.examId);
+              const examDetail = await examAPI.getExamById(item.examId);
               
               // 获取课程信息
               let courseName = '未知课程';
               if (examDetail.courseId) {
                 try {
-                  const courseDetail = await course.getCourseById(examDetail.courseId);
+                  const courseDetail = await courseAPI.getCourseById(examDetail.courseId);
                   courseName = courseDetail.name;
                 } catch (e) {
                   console.error('获取课程信息失败:', e);
@@ -180,6 +188,7 @@ export default {
       assignments,
       loading,
       error,
+      apiTestResults,
       formatDate,
       handleAssignment
     };

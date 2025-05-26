@@ -21,7 +21,7 @@
 import RegisterForm from '@/components/auth/RegisterForm.vue'
 import { useRouter } from 'vue-router'
 import { ref } from 'vue'
-import { registerTeacher, registerStudent } from '@/api/auth' // 导入API
+import { authAPI } from '@/api/api'
 
 export default {
   name: 'RegisterView',
@@ -52,10 +52,10 @@ export default {
         let response;
         if (userData.role === 'teacher') {
           console.log('尝试注册教师:', apiPayload);
-          response = await registerTeacher(apiPayload);
+          response = await authAPI.teacherRegister(apiPayload);
         } else if (userData.role === 'student') {
           console.log('尝试注册学生:', apiPayload);
-          response = await registerStudent(apiPayload);
+          response = await authAPI.studentRegister(apiPayload);
         } else {
           registrationError.value = '无效的用户角色';
           isRegistering.value = false;

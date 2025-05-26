@@ -35,8 +35,7 @@
 
 <script>
 import { ref, onMounted } from 'vue';
-import { getUserInfo, getToken } from '@/utils/auth';
-import { course, learningProgress, student } from '@/api/api';
+import { courseAPI, learningProgressAPI, studentAPI } from '@/api/api';
 
 export default {
   name: 'StudentCourses',
@@ -44,6 +43,7 @@ export default {
     const courses = ref([]);
     const loading = ref(false);
     const error = ref('');
+    const apiTestResults = ref({});
     
     // 获取学生课程数据
     const fetchCourses = async () => {
@@ -51,77 +51,36 @@ export default {
       error.value = '';
       
       try {
-        // 获取当前登录的用户信息
-        const userInfo = getUserInfo();
-        if (!userInfo) {
-          throw new Error('无法获取用户信息，请重新登录');
+        // 直接使用 getSelfStudentInfo() 获取当前登录学生信息
+        const selfStudentInfo = await studentAPI.getSelfStudentInfo();
+        
+        if (!selfStudentInfo || !selfStudentInfo.studentId) {
+          throw new Error('无法获取学生信息');
         }
         
-        // 获取学生ID
-        let studentId;
+        const studentId = selfStudentInfo.studentId;
+        console.log('通过 self 接口获取学生ID:', studentId);
+        apiTestResults.value.studentInfo = selfStudentInfo;
         
-        // 直接通过API获取学生ID
-        if (userInfo && userInfo.username) {
-            try {
-              // 通过用户名获取学生信息
-              const apiStudentInfo = await student.getStudentByUsername(userInfo.username);
-            if (apiStudentInfo && apiStudentInfo.studentId) {
-              studentId = apiStudentInfo.studentId;
-                console.log('通过API获取学生ID:', studentId);
-            } else {
-              throw new Error('API返回的学生信息不完整');
-              }
-            } catch (e) {
-              console.error('获取学生信息失败:', e);
-            throw new Error('无法通过API获取学生ID');
-          }
-        } else {
-          throw new Error('无法获取用户名');
-        }
+        // API测试：获取所有课程
+        const allCourses = await courseAPI.getAllCourses();
+        console.log('[API测试] 获取所有课程成功:', allCourses);
+        apiTestResults.value.allCourses = allCourses;
         
-        if (!studentId) {
-          throw new Error('无法获取学生ID');
-        }
+        // API测试：获取学生课程进度
+        const progressData = await learningProgressAPI.getStudentProgress(studentId);
+        console.log('[API测试] 获取学生课程进度成功:', progressData);
+        apiTestResults.value.studentProgress = progressData;
         
-        // 获取当前token
-        const token = getToken();
+        // 处理课程进度
+        courses.value = allCourses.map(course => ({
+          ...course,
+          progress: progressData.find(p => p.courseId === course.id)?.progress || 0
+        }));
         
-        // 获取所有课程，传递token
-        const allCourses = await course.getAllCourses(token);
-        
-        // 获取学生的课程进度，传递token
-        const progressData = await learningProgress.getStudentProgress(studentId, token);
-        
-        // 合并课程信息和进度信息
-        const coursesWithProgress = allCourses.map(courseItem => {
-          // 查找该课程的进度信息
-          const progress = progressData.find(p => p.courseId === courseItem.id);
-          
-          return {
-            ...courseItem,
-            progress: progress ? progress.progressPercentage : 0
-          };
-        });
-        
-        courses.value = coursesWithProgress;
       } catch (e) {
         console.error('获取课程数据失败:', e);
-        
-        // 提供更详细的错误信息
-        let errorMessage = '获取课程数据失败，请稍后重试';
-        
-        if (e.response) {
-          // 服务器返回错误
-          errorMessage = `服务器错误: ${e.response.data?.message || e.response.statusText}`;
-        } else if (e.request) {
-          // 请求已发出，但没有收到响应
-          errorMessage = '网络错误：未能连接到服务器';
-        } else {
-          // 在设置请求时发生了错误
-          errorMessage = `请求错误: ${e.message}`;
-        }
-        
-        error.value = errorMessage;
+        error.value = e.message || '获取课程数据失败，请稍后重试';
       } finally {
         loading.value = false;
       }
@@ -146,13 +105,14 @@ export default {
       // router.push({ name: 'CourseDetail', params: { id: course.id } });
     };
     
-    // 组件挂载时获取课程数据
+    // 组件挂载时获取数据
     onMounted(fetchCourses);
     
     return {
       courses,
       loading,
       error,
+      apiTestResults,
       getStatusClass,
       getStatusText,
       enterCourse
