@@ -252,7 +252,9 @@ export default {
     
     const testBatchSaveAttendance = async () => {
       try {
-        const result = await attendanceAPI.batchSaveAttendance(batchSaveJson)
+        const arr = JSON.parse(batchSaveJson.value)
+        const data = JSON.parse(JSON.stringify(arr))
+        const result = await attendanceAPI.batchSaveAttendance(data)
         resultBatchSave.value = result
         ElMessage.success('批量新增考勤测试成功')
       } catch (error) {

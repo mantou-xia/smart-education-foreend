@@ -174,7 +174,6 @@ export default {
     const testAskQuestion = async () => {
       try {
         const studentInfo = await studentAPI.getSelfStudentInfo()
-        
         let result
         if (questionForm.courseName) {
           result = await studentAssistantAPI.askQuestionByCourseName(
@@ -188,20 +187,17 @@ export default {
             questionForm.question
           )
         }
-        
         assistantResult.value = {
           success: true,
           message: '智能助理问答测试成功',
           data: result
         }
-        
         ElMessage.success('智能助理问答测试成功')
       } catch (error) {
         assistantResult.value = {
           success: false,
           message: error.message || '智能助理问答测试失败'
         }
-        
         ElMessage.error('智能助理问答测试失败')
       }
     }

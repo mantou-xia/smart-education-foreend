@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { getToken } from '@/utils/auth';
+import qs from 'qs';
 
 // 学生端 Axios 实例
 const studentAxios = axios.create({
@@ -57,27 +58,32 @@ const createTeacherAuthorizedAxios = () => {
     return instance;
 };
 
+// ref兼容辅助函数
+function getValue(v) {
+    return (v && typeof v === 'object' && 'value' in v) ? v.value : v;
+}
+
 // 认证相关 API
 export const authAPI = {
     /**
      * 学生登录接口
-     * @param {string} username 用户名
-     * @param {string} password 密码
+     * @param {string|object} username 用户名（支持ref/普通类型）
+     * @param {string|object} password 密码（支持ref/普通类型）
      * @returns {Promise<{tokens: {accessToken: string, refreshToken: string}, roles: string[]}>} 登录响应，包含token和角色
      */
     async studentLogin(username, password) {
-        const response = await studentAxios.post('/api/auth/login', { username, password });
+        const response = await studentAxios.post('/api/auth/login', { username: getValue(username), password: getValue(password) });
         return response.data;
     },
 
     /**
      * 教师登录接口
-     * @param {string} username 用户名
-     * @param {string} password 密码
+     * @param {string|object} username 用户名（支持ref/普通类型）
+     * @param {string|object} password 密码（支持ref/普通类型）
      * @returns {Promise<{tokens: {accessToken: string, refreshToken: string}, roles: string[]}>} 登录响应，包含token和角色
      */
     async teacherLogin(username, password) {
-        const response = await teacherAxios.post('/api/auth/login', { username, password });
+        const response = await teacherAxios.post('/api/auth/login', { username: getValue(username), password: getValue(password) });
         return response.data;
     },
 
@@ -228,13 +234,14 @@ export const studentAPI = {
 
     /**
      * 根据学生ID获取学生信息（需要token）
-     * @param {number} studentId 学生ID
+     * @param {string|number} studentId 学生ID（建议传字符串，防止精度丢失）
      * @returns {Promise<Object>} 学生信息
-     * 返回字段：同 saveOrUpdateStudent 返回字段
      */
     async getStudentById(studentId) {
         const axios = createStudentAuthorizedAxios();
-        const response = await axios.get(`/api/student/${studentId}`);
+        // 强制转字符串，防止大整数精度丢失
+        const idStr = String(studentId);
+        const response = await axios.get(`/api/student/${idStr}`);
         return response.data;
     },
 
@@ -770,7 +777,11 @@ export const learningProgressAPI = {
      */
     async batchUpdateLearningProgress(progressList) {
         const axios = createStudentAuthorizedAxios();
-        const response = await axios.post('/api/learning-progress/batch-update', progressList);
+        const response = await axios.post(
+            '/api/learning-progress/batch-update',
+            progressList,
+            { headers: { 'Content-Type': 'application/json' } }
+        );
         return response.data;
     },
 };
@@ -1430,7 +1441,13 @@ export const learningPlanAPI = {
         const params = { targetGoal, timeFrame };
         if (courseIds) params.courseIds = courseIds;
         if (knowledgeIds) params.knowledgeIds = knowledgeIds;
-        const response = await axios.get(`/api/learning-plan/student/${studentId}/generate`, { params });
+        const response = await axios.get(
+            `/api/learning-plan/student/${studentId}/generate`,
+            {
+                params,
+                paramsSerializer: params => qs.stringify(params, { arrayFormat: 'repeat' })
+            }
+        );
         return response.data;
     },
 
@@ -1446,7 +1463,13 @@ export const learningPlanAPI = {
     async generateLearningPlanByKnowledgeName(studentId, targetGoal, timeFrame, knowledgeNames) {
         const axios = createStudentAuthorizedAxios();
         const params = { targetGoal, timeFrame, knowledgeNames };
-        const response = await axios.get(`/api/learning-plan/student/${studentId}/generate/knowledge-names`, { params });
+        const response = await axios.get(
+            `/api/learning-plan/student/${studentId}/generate/knowledge-names`,
+            {
+                params,
+                paramsSerializer: params => qs.stringify(params, { arrayFormat: 'repeat' })
+            }
+        );
         return response.data;
     },
 
@@ -1462,7 +1485,13 @@ export const learningPlanAPI = {
     async generateLearningPlanByCourseName(studentId, targetGoal, timeFrame, courseNames) {
         const axios = createStudentAuthorizedAxios();
         const params = { targetGoal, timeFrame, courseNames };
-        const response = await axios.get(`/api/learning-plan/student/${studentId}/generate/course-names`, { params });
+        const response = await axios.get(
+            `/api/learning-plan/student/${studentId}/generate/course-names`,
+            {
+                params,
+                paramsSerializer: params => qs.stringify(params, { arrayFormat: 'repeat' })
+            }
+        );
         return response.data;
     },
 
@@ -1509,147 +1538,135 @@ export const learningPlanAPI = {
 export const attendanceAPI = {
     /**
      * 更新考勤状态（需要token）
-     * @param {number} attendanceId 考勤ID
-     * @param {string} status 状态
-     * @param {string} [remark] 备注（可选）
+     * @param {number|string|object} attendanceId 考勤ID（支持ref/普通类型）
+     * @param {string|object} status 状态（支持ref/普通类型）
+     * @param {string|object} [remark] 备注（支持ref/普通类型）
      * @returns {Promise<Object>} 更新结果
-     * 返回字段：由后端返回，通常包含考勤相关信息
      */
     async updateAttendanceStatus(attendanceId, status, remark) {
         const axios = createStudentAuthorizedAxios();
-        const params = { status };
-        if (remark) params.remark = remark;
-        const response = await axios.put(`/api/attendance/${attendanceId}/status`, null, { params });
+        const id = getValue(attendanceId);
+        const stat = getValue(status);
+        const rem = getValue(remark);
+        const params = { status: stat };
+        if (rem !== undefined && rem !== null && rem !== '') params.remark = rem;
+        const response = await axios.put(`/api/attendance/${id}/status`, null, { params });
         return response.data;
     },
 
     /**
      * 按课程名称更新考勤（需要token）
-     * @param {number} studentId 学生ID
-     * @param {string} courseName 课程名称
-     * @param {string} date 日期（YYYY-MM-DD）
-     * @param {string} status 状态
-     * @param {string} [remark] 备注（可选）
+     * @param {number|object} studentId 学生ID（支持ref/普通类型）
+     * @param {string|object} courseName 课程名称（支持ref/普通类型）
+     * @param {string|object} date 日期（YYYY-MM-DD，支持ref/普通类型）
+     * @param {string|object} status 状态（支持ref/普通类型）
+     * @param {string|object} [remark] 备注（支持ref/普通类型，可选）
      * @returns {Promise<Object>} 更新结果
      * 返回字段：由后端返回，通常包含考勤相关信息
      */
     async updateAttendanceByCourseName(studentId, courseName, date, status, remark) {
         const axios = createStudentAuthorizedAxios();
-        const params = { courseName, date, status };
-        if (remark) params.remark = remark;
-        const response = await axios.put(`/api/attendance/student/${studentId}/course/update`, null, { params });
+        const params = {
+            courseName: getValue(courseName),
+            date: getValue(date),
+            status: getValue(status)
+        };
+        const rem = getValue(remark);
+        if (rem !== undefined && rem !== null && rem !== '') params.remark = rem;
+        const response = await axios.put(`/api/attendance/student/${getValue(studentId)}/course/update`, null, { params });
         return response.data;
     },
 
     /**
      * 新增考勤（需要token）
      * @param {Object} attendanceData 考勤信息
-     * @param {number} attendanceData.courseId 课程ID
-     * @param {number} attendanceData.studentId 学生ID
-     * @param {string} attendanceData.status 状态
-     * @param {string} attendanceData.attendanceDate 考勤日期（YYYY-MM-DD）
-     * @param {string} [attendanceData.remark] 备注（可选）
      * @returns {Promise<Object>} 新增后的考勤信息
-     * 返回字段：
-     *   - attendanceId: number 考勤ID
-     *   - courseId: number 课程ID
-     *   - studentId: number 学生ID
-     *   - status: string 状态
-     *   - attendanceDate: string 考勤日期
-     *   - remark: string 备注
-     *   - recordedBy: number 记录人ID
-     *   - createdAt: string 创建时间（ISO格式）
-     *   - updatedAt: string 更新时间（ISO格式）
-     *   - courseName: string 课程名称
-     *   - studentName: string 学生姓名
-     *   - recorderName: string 记录人姓名
-     *   - absent: boolean 是否缺勤
-     *   - late: boolean 是否迟到
-     *   - present: boolean 是否出勤
      */
     async saveAttendance(attendanceData) {
         const axios = createStudentAuthorizedAxios();
-        const response = await axios.post('/api/attendance/save', attendanceData);
+        const data = getValue(attendanceData);
+        const response = await axios.post('/api/attendance/save', data);
         return response.data;
     },
 
     /**
      * 批量新增考勤（需要token）
-     * @param {Array<Object>} attendanceList 考勤信息数组
+     * @param {Array<Object>|object} attendanceList 考勤信息数组（支持ref/普通类型）
      * @returns {Promise<Object>} 批量新增结果
-     * 返回字段：由后端返回，通常包含批量操作结果
      */
     async batchSaveAttendance(attendanceList) {
         const axios = createStudentAuthorizedAxios();
-        const response = await axios.post('/api/attendance/batch-save', attendanceList);
+        // 自动去除响应式
+        const pureList = JSON.parse(JSON.stringify(getValue(attendanceList)));
+        const response = await axios.post('/api/attendance/batch-save', pureList);
         return response.data;
     },
 
     /**
      * 获取学生考勤记录（需要token）
-     * @param {number} studentId 学生ID
+     * @param {number|object} studentId 学生ID（支持ref/普通类型）
      * @returns {Promise<Array<Object>>} 考勤记录列表
-     * 每项字段：同 saveAttendance 返回字段
      */
     async getStudentAttendance(studentId) {
         const axios = createStudentAuthorizedAxios();
-        const response = await axios.get(`/api/attendance/student/${studentId}`);
+        const id = getValue(studentId);
+        const response = await axios.get(`/api/attendance/student/${id}`);
         return response.data;
     },
 
     /**
      * 根据状态获取学生考勤记录（需要token）
-     * @param {number} studentId 学生ID
-     * @param {string} status 状态
+     * @param {number|object} studentId 学生ID（支持ref/普通类型）
+     * @param {string|object} status 状态（支持ref/普通类型）
      * @returns {Promise<Array<Object>>} 考勤记录列表
-     * 每项字段：同 saveAttendance 返回字段
      */
     async getStudentAttendanceByStatus(studentId, status) {
         const axios = createStudentAuthorizedAxios();
-        const response = await axios.get(`/api/attendance/student/${studentId}/status/${status}`);
+        const id = getValue(studentId);
+        const stat = getValue(status);
+        const response = await axios.get(`/api/attendance/student/${id}/status/${stat}`);
         return response.data;
     },
 
     /**
      * 获取学生考勤统计（需要token）
-     * @param {number} studentId 学生ID
+     * @param {number|object} studentId 学生ID（支持ref/普通类型）
      * @returns {Promise<Object>} 统计信息
-     * 字段：由后端返回，通常包含统计相关信息
      */
     async getAttendanceStatistics(studentId) {
         const axios = createStudentAuthorizedAxios();
-        const response = await axios.get(`/api/attendance/student/${studentId}/statistics`);
+        const id = getValue(studentId);
+        const response = await axios.get(`/api/attendance/student/${id}/statistics`);
         return response.data;
     },
 
     /**
      * 搜索考勤记录（需要token）
-     * @param {number} studentId 学生ID
-     * @param {Object} params 查询参数
-     * @param {string} [params.keywords] 关键词（可选）
-     * @param {string} [params.status] 状态（可选）
-     * @param {string} [params.startDate] 起始日期（可选，YYYY-MM-DD）
-     * @param {string} [params.endDate] 结束日期（可选，YYYY-MM-DD）
+     * @param {number|object} studentId 学生ID（支持ref/普通类型）
+     * @param {Object|object} params 查询参数（支持ref/普通类型）
      * @returns {Promise<Array<Object>>} 考勤记录列表
-     * 每项字段：同 saveAttendance 返回字段
      */
     async searchAttendance(studentId, params) {
         const axios = createStudentAuthorizedAxios();
-        const response = await axios.get(`/api/attendance/student/${studentId}/search`, { params });
+        const id = getValue(studentId);
+        const p = getValue(params);
+        const response = await axios.get(`/api/attendance/student/${id}/search`, { params: p });
         return response.data;
     },
 
     /**
      * 按日期范围获取学生考勤记录（需要token）
-     * @param {number} studentId 学生ID
-     * @param {string} startDate 起始日期（YYYY-MM-DD）
-     * @param {string} endDate 结束日期（YYYY-MM-DD）
+     * @param {number|object} studentId 学生ID（支持ref/普通类型）
+     * @param {string|object} startDate 起始日期（支持ref/普通类型）
+     * @param {string|object} endDate 结束日期（支持ref/普通类型）
      * @returns {Promise<Array<Object>>} 考勤记录列表
-     * 每项字段：同 saveAttendance 返回字段
      */
     async getStudentAttendanceByDateRange(studentId, startDate, endDate) {
         const axios = createStudentAuthorizedAxios();
-        const response = await axios.get(`/api/attendance/student/${studentId}/date-range`, { params: { startDate, endDate } });
+        const id = getValue(studentId);
+        const start = getValue(startDate);
+        const end = getValue(endDate);
+        const response = await axios.get(`/api/attendance/student/${id}/date-range`, { params: { startDate: start, endDate: end } });
         return response.data;
     },
 
@@ -1662,40 +1679,46 @@ export const attendanceAPI = {
      */
     async getStudentCourseAttendance(studentId, courseId) {
         const axios = createStudentAuthorizedAxios();
-        const response = await axios.get(`/api/attendance/student/${studentId}/course/${courseId}`);
+        const sid = getValue(studentId);
+        const cid = getValue(courseId);
+        const response = await axios.get(`/api/attendance/student/${sid}/course/${cid}`);
         return response.data;
     },
 
     /**
      * 获取学生某课程的考勤统计（需要token）
-     * @param {number} studentId 学生ID
-     * @param {number} courseId 课程ID
+     * @param {number|object} studentId 学生ID（支持ref/普通类型）
+     * @param {number|object} courseId 课程ID（支持ref/普通类型）
      * @returns {Promise<Object>} 统计信息
      * 字段：由后端返回，通常包含统计相关信息
      */
     async getCourseAttendanceStatistics(studentId, courseId) {
         const axios = createStudentAuthorizedAxios();
-        const response = await axios.get(`/api/attendance/student/${studentId}/course/${courseId}/statistics`);
+        const sid = getValue(studentId);
+        const cid = getValue(courseId);
+        const response = await axios.get(`/api/attendance/student/${sid}/course/${cid}/statistics`);
         return response.data;
     },
 
     /**
      * 按课程名称获取考勤统计（需要token）
-     * @param {number} studentId 学生ID
-     * @param {string} courseName 课程名称
+     * @param {number|object} studentId 学生ID（支持ref/普通类型）
+     * @param {string|object} courseName 课程名称（支持ref/普通类型）
      * @returns {Promise<Object>} 统计信息
      * 字段：由后端返回，通常包含统计相关信息
      */
     async getAttendanceStatisticsByCourseName(studentId, courseName) {
         const axios = createStudentAuthorizedAxios();
-        const response = await axios.get(`/api/attendance/student/${studentId}/course/statistics`, { params: { courseName } });
+        const sid = getValue(studentId);
+        const cname = getValue(courseName);
+        const response = await axios.get(`/api/attendance/student/${sid}/course/statistics`, { params: { courseName: cname } });
         return response.data;
     },
 
     /**
      * 按课程名称获取考勤记录（需要token）
-     * @param {number} studentId 学生ID
-     * @param {string} courseName 课程名称
+     * @param {number|object} studentId 学生ID（支持ref/普通类型）
+     * @param {string|object} courseName 课程名称（支持ref/普通类型）
      * @returns {Promise<Array<Object>>} 考勤记录列表
      * 返回字段：
      *   - attendanceId: number 考勤ID
@@ -1716,7 +1739,9 @@ export const attendanceAPI = {
      */
     async getStudentAttendanceByCourseName(studentId, courseName) {
         const axios = createStudentAuthorizedAxios();
-        const response = await axios.get(`/api/attendance/student/${studentId}/course/name`, { params: { courseName } });
+        const sid = getValue(studentId);
+        const cname = getValue(courseName);
+        const response = await axios.get(`/api/attendance/student/${sid}/course/name`, { params: { courseName: cname } });
         return response.data;
     }
 };
@@ -1775,7 +1800,12 @@ export const studentExamAPI = {
      */
     async batchSubmitAnswers(answerList) {
         const axios = createStudentAuthorizedAxios();
-        const response = await axios.post('/api/student-exam/batch-submit', answerList);
+        const data = JSON.parse(JSON.stringify(getValue(answerList)));
+        const response = await axios.post(
+            '/api/student-exam/batch-submit',
+            data,
+            { headers: { 'Content-Type': 'application/json' } }
+        );
         return response.data;
     },
 
